@@ -4,6 +4,8 @@ Generic MCP Client Application
 
 This script provides a generic implementation that works with mcp_config.json
 to connect to any MCP server and interact with its available tools via HTTP proxy.
+
+Brought to you by Appsecco - Your Trusted Security Partner
 """
 
 import json
@@ -18,12 +20,51 @@ from typing import Dict, Any, List, Optional
 import argparse
 
 
+# Appsecco Version Information
+APPSECCO_VERSION = "1.0.0"
+APPSECCO_BUILD = "Professional Edition"
+APPSECCO_COPYRIGHT = "© 2024 Appsecco. All rights reserved."
+
+
+# Appsecco ASCII Art Banner
+APPSECCO_BANNER = """
+    ╔══════════════════════════════════════════════════════════════════════════════╗
+    ║                                                                              ║
+    ║                                                                              ║
+    ║     █████  ██████   ██████ ███████ ████████ ███████ ██████  ██████       ║
+    ║    ██   ██ ██   ██ ██      ██         ██    ██      ██   ██ ██   ██      ║
+    ║    ███████ ██████  ██      █████      ██    █████   ██████  ██████       ║
+    ║    ██   ██ ██   ██ ██      ██         ██    ██      ██   ██ ██   ██      ║
+    ║    ██   ██ ██   ██  ██████ ███████   ██    ███████ ██   ██ ██   ██       ║
+    ║                                                                              ║
+    ║                    ╔══════════════════════════════════════════════════════╗  ║
+    ║                    ║        MCP CLIENT AND PROXY                          ║  ║
+    ║                    ║      A generic MCP client with ability to            ║  ║
+    ║                    ║           send traffic to Burp Suite                 ║  ║
+    ║                    ║           Version {version} - {build}                ║  ║
+    ║                    ╚══════════════════════════════════════════════════════╝  ║
+    ║                                                                              ║
+    ║  🛠️   Built for pentesting MCP servers using STDIO transport              ║
+    ║  🎯   Aimed at folks who use Burp Suite for their app testing workflows   ║
+    ║  💻   Vibe coded, MIT License, not meant for production use               ║
+    ║                                                                              ║
+    ║  📧   Contact: riyaz@appsecco.com | 🌐   Website: https://appsecco.com    ║
+    ║                                                                              ║
+    ╚══════════════════════════════════════════════════════════════════════════════╝
+""".format(version=APPSECCO_VERSION, build=APPSECCO_BUILD)
+
+# Appsecco Tagline
+APPSECCO_TAGLINE = """
+🔒  WE HACK YOUR PRODUCTS & INFRA BEFORE ATTACKERS DO  🔒
+"""
+
+
 class MCPConfig:
-    """Configuration manager for MCP servers"""
+    """Appsecco MCP Client and Proxy - Configuration manager for MCP servers"""
     
     def __init__(self, config_file: str = "mcp_config.json"):
         """
-        Initialize configuration from JSON file
+        Initialize Appsecco MCP Client and Proxy configuration from JSON file
         
         Args:
             config_file: Path to the MCP configuration file
@@ -55,11 +96,11 @@ class MCPConfig:
 
 
 class MCPClient:
-    """Generic MCP Client for communicating with any MCP Server via HTTP proxy"""
+    """Appsecco MCP Client and Proxy - Generic MCP Client for communicating with any MCP Server via HTTP proxy"""
     
     def __init__(self, server_config: Dict[str, Any], proxy_url: str = "http://127.0.0.1:8080", use_proxychains: bool = True, bypass_ssl: bool = True):
         """
-        Initialize the MCP client
+        Initialize the Appsecco MCP Client and Proxy
         
         Args:
             server_config: Server configuration from mcp_config.json
@@ -490,11 +531,11 @@ class MCPClient:
 
 
 class GenericMCPApp:
-    """Generic MCP Application with interactive interface"""
+    """Appsecco MCP Client PST - Professional Security Testing Application with interactive interface"""
     
     def __init__(self, config_file: str = "mcp_config.json", proxy_url: str = "http://127.0.0.1:8080", use_burp_proxy: bool = True, use_proxychains: bool = True, bypass_ssl: bool = True):
         """
-        Initialize the application
+        Initialize the Appsecco MCP Client PST application
         
         Args:
             config_file: Path to the MCP configuration file
@@ -539,7 +580,7 @@ class GenericMCPApp:
                         self.client = MCPClient(server_config, self.proxy_url, self.use_proxychains, self.bypass_ssl)
                         # Set Burp proxy setting
                         self.client.use_burp_proxy = self.use_burp_proxy
-                        print(f"✅ Selected server: {server_name}")
+                        print(f"✅ Appsecco MCP Client PST - Selected server: {server_name}")
                         return True
                     else:
                         print(f"❌ Invalid configuration for server: {server_name}")
@@ -558,6 +599,7 @@ class GenericMCPApp:
             print("❌ No server selected")
             return False
         
+        print(f"🚀 Appsecco MCP Client PST - Starting server: {self.current_server}")
         if not self.client.start_server():
             return False
         
@@ -778,9 +820,13 @@ class GenericMCPApp:
     
     def interactive_mode(self, start_proxy: bool = False, proxy_port: int = 3000):
         """Run interactive mode"""
-        print("\n" + "="*60)
-        print("🔧 Generic MCP Client - Interactive Mode")
-        print("="*60)
+        # Display Appsecco banner
+        print(APPSECCO_BANNER)
+        print(APPSECCO_TAGLINE)
+        
+        print("\n" + "="*80)
+        print("🔧 Appsecco MCP Client PST - Professional Security Testing Tool")
+        print("="*80)
         print(f"🌐 HTTP requests via Burp: {self.proxy_url}")
         print(f"🔗 Proxychains: {'Yes (port 8080)' if self.use_proxychains else 'No'}")
         print(f"🔓 SSL bypass: {'Yes' if self.bypass_ssl else 'No'}")
@@ -818,14 +864,17 @@ class GenericMCPApp:
             
             # Interactive menu
             while True:
-                print("\n" + "-"*50)
+                print("\n" + "-"*60)
+                print("🔧 Appsecco MCP Client PST - Professional Security Testing")
+                print("-"*60)
                 print("Choose an option:")
-                print("1. Call a tool")
-                print("2. List tools again")
-                print("3. Switch server")
-                print("4. Exit")
+                print("1. 🛠️  Call a tool")
+                print("2. 📋 List tools again")
+                print("3. 🔄 Switch server")
+                print("4. 🚪 Exit")
+                print("5. ℹ️  About Appsecco")
                 
-                choice = input("\nEnter your choice (1-4): ").strip()
+                choice = input("\nEnter your choice (1-5): ").strip()
                 
                 if choice == "1":
                     self._call_tool_interactive(tools)
@@ -842,8 +891,10 @@ class GenericMCPApp:
                 elif choice == "4":
                     print("\n👋 Goodbye!")
                     break
+                elif choice == "5":
+                    self._show_about_appsecco()
                 else:
-                    print("❌ Invalid choice. Please enter 1-4.")
+                    print("❌ Invalid choice. Please enter 1-5.")
         
         except KeyboardInterrupt:
             print("\n\n⏹️  Interrupted by user")
@@ -853,6 +904,14 @@ class GenericMCPApp:
             if self.client:
                 self.stop_proxy_server()
                 self.client.stop_server()
+            
+            # Display Appsecco footer
+            print("\n" + "="*80)
+            print("🛡️  Thank you for using Appsecco MCP Client PST!")
+            print(f"📋 Version: {APPSECCO_VERSION} - {APPSECCO_BUILD}")
+            print(f"©  {APPSECCO_COPYRIGHT}")
+            print("🌐 Visit https://appsecco.com for professional security services")
+            print("="*80)
     
     def _call_tool_interactive(self, tools: List[Dict[str, Any]]):
         """Interactive tool calling"""
@@ -873,6 +932,35 @@ class GenericMCPApp:
             print("❌ Please enter a valid number")
         except KeyboardInterrupt:
             print("\n⏹️  Cancelled")
+    
+    def _show_about_appsecco(self):
+        """Display information about Appsecco"""
+        print("\n" + "="*80)
+        print("ℹ️  ABOUT APPSECCO - Your Trusted Security Partner")
+        print("="*80)
+        print("🛡️  Appsecco is a leading cybersecurity company specializing in:")
+        print("   • Penetration Testing & Security Assessments")
+        print("   • Application Security Testing")
+        print("   • Infrastructure Security Audits")
+        print("   • Cloud Security Assessments")
+        print("   • Red Team Operations")
+        print("   • Security Training & Awareness")
+        print()
+        print("🔍  This MCP Client PST tool is part of our professional security toolkit")
+        print("   designed for security researchers, penetration testers, and")
+        print("   security professionals who need advanced MCP server integration.")
+        print()
+        print("🌐  Website: https://appsecco.com")
+        print("📧  Email: info@appsecco.com")
+        print("📱  LinkedIn: https://linkedin.com/company/appsecco")
+        print("🐦  Twitter: @appsecco")
+        print()
+        print("💼  Professional Services:")
+        print("   • Enterprise Security Assessments")
+        print("   • Compliance & Regulatory Support")
+        print("   • Incident Response & Forensics")
+        print("   • Security Architecture Design")
+        print("="*80)
     
     def _get_tool_arguments_and_call(self, tool: Dict[str, Any]):
         """Get tool arguments and call the tool"""
@@ -938,10 +1026,10 @@ class GenericMCPApp:
     
 
 def main():
-    """Main entry point"""
+    """Main entry point for Appsecco MCP Client PST"""
     parser = argparse.ArgumentParser(
-        description="Generic MCP Client Application with proxychains support",
-        epilog="Example: python app.py --start-proxy"
+        description="Appsecco MCP Client PST - Professional Security Testing Tool with proxychains support",
+        epilog="Example: python app.py --start-proxy\n\nBrought to you by Appsecco - Your Trusted Security Partner"
     )
     parser.add_argument("--config", "-c", default="mcp_config.json", 
                        help="MCP configuration file (default: mcp_config.json)")
