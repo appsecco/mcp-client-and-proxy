@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 """
-Generic MCP Client Application
+Generic MCP Client and Proxy
 
 This script provides a generic implementation that works with mcp_config.json
 to connect to any MCP server and interact with its available tools via HTTP proxy.
 
-Brought to you by Appsecco - Your Trusted Security Partner
+Brought to you by Appsecco - Product Security Experts
 """
 
 import json
@@ -21,34 +21,45 @@ import argparse
 
 
 # Appsecco Version Information
-APPSECCO_VERSION = "1.0.0"
-APPSECCO_BUILD = "Professional Edition"
-APPSECCO_COPYRIGHT = "© 2024 Appsecco. All rights reserved."
+APPSECCO_VERSION = "0.1.0"
+APPSECCO_BUILD = "Profesh Edition with vibes"
+APPSECCO_COPYRIGHT = "© 2025 Appsecco. All rights reserved."
 
 
 # Appsecco ASCII Art Banner
+APPSECCO_ASCII_ART = """
+   ###    ########  ########   ######  ########  ######   ######   ####### 
+  ## ##   ##     ## ##     ## ##    ## ##       ##    ## ##    ## ##     ##
+ ##   ##  ##     ## ##     ## ##       ##       ##       ##       ##     ##
+##     ## ########  ########   ######  ######   ##       ##       ##     ##
+######### ##        ##              ## ##       ##       ##       ##     ##
+##     ## ##        ##        ##    ## ##       ##    ## ##    ## ##     ##
+##     ## ##        ##         ######  ########  ######   ######   ####### 
+"""
+
 APPSECCO_BANNER = """
     ╔══════════════════════════════════════════════════════════════════════════════╗
+      ###    ########  ########   ######  ########  ######   ######   ####### 
+     ## ##   ##     ## ##     ## ##    ## ##       ##    ## ##    ## ##     ##
+    ##   ##  ##     ## ##     ## ##       ##       ##       ##       ##     ##
+   ##     ## ########  ########   ######  ######   ##       ##       ##     ##
+   ######### ##        ##              ## ##       ##       ##       ##     ##
+   ##     ## ##        ##        ##    ## ##       ##    ## ##    ## ##     ##
+   ##     ## ##        ##         ######  ########  ######   ######   ####### 
+               ║
     ║                                                                              ║
+    ║                   ╔══════════════════════════════════════════════════════╗   ║
+    ║                   ║        MCP CLIENT AND PROXY                          ║   ║
+    ║                   ║      A generic MCP client with ability to            ║   ║
+    ║                   ║           send traffic to Burp Suite                 ║   ║
+    ║                   ║           Version {version} - {build}                ║   ║
+    ║                   ╚══════════════════════════════════════════════════════╝   ║
     ║                                                                              ║
-    ║     █████  ██████   ██████ ███████ ████████ ███████ ██████  ██████       ║
-    ║    ██   ██ ██   ██ ██      ██         ██    ██      ██   ██ ██   ██      ║
-    ║    ███████ ██████  ██      █████      ██    █████   ██████  ██████       ║
-    ║    ██   ██ ██   ██ ██      ██         ██    ██      ██   ██ ██   ██      ║
-    ║    ██   ██ ██   ██  ██████ ███████   ██    ███████ ██   ██ ██   ██       ║
-    ║                                                                              ║
-    ║                    ╔══════════════════════════════════════════════════════╗  ║
-    ║                    ║        MCP CLIENT AND PROXY                          ║  ║
-    ║                    ║      A generic MCP client with ability to            ║  ║
-    ║                    ║           send traffic to Burp Suite                 ║  ║
-    ║                    ║           Version {version} - {build}                ║  ║
-    ║                    ╚══════════════════════════════════════════════════════╝  ║
-    ║                                                                              ║
-    ║  🛠️   Built for pentesting MCP servers using STDIO transport              ║
-    ║  🎯   Aimed at folks who use Burp Suite for their app testing workflows   ║
-    ║  💻   Vibe coded, MIT License, not meant for production use               ║
-    ║                                                                              ║
-    ║  📧   Contact: riyaz@appsecco.com | 🌐   Website: https://appsecco.com    ║
+    ║  🛠️   Built for pentesting MCP servers using STDIO transport                  ║
+    ║  🎯   Aimed at folks who use Burp Suite for their app testing workflows       ║
+    ║  💻   Vibe coded, MIT License, not meant for production use                   ║
+    ║                                                                               ║
+    ║  📧   Email: HackMyProduct@appsecco.com | 🌐 Website: https://appsecco.com    ║
     ║                                                                              ║
     ╚══════════════════════════════════════════════════════════════════════════════╝
 """.format(version=APPSECCO_VERSION, build=APPSECCO_BUILD)
@@ -60,7 +71,7 @@ APPSECCO_TAGLINE = """
 
 
 class MCPConfig:
-    """Appsecco MCP Client and Proxy - Configuration manager for MCP servers"""
+    """Appsecco MCP Client and Proxy - Send MCP Server Traffic to your Burp Suite"""
     
     def __init__(self, config_file: str = "mcp_config.json"):
         """

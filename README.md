@@ -1,16 +1,12 @@
-# Appsecco MCP Client PST
+# Appsecco MCP Client and Proxy
 
-> **Professional Security Testing Tool** - Advanced MCP Server Integration with Enterprise-Grade Proxy & Burp Suite Integration
+> **Semi Professional Security Tool with Cool Vibes** -  Send MCP Server Traffic to your Burp Suite
 
 [![Appsecco](https://img.shields.io/badge/Powered%20by-Appsecco-blue?style=for-the-badge&logo=security)](https://appsecco.com)
 [![License](https://img.shields.io/badge/License-MIT-green.svg?style=for-the-badge)](LICENSE)
 [![Python](https://img.shields.io/badge/Python-3.7+-blue.svg?style=for-the-badge&logo=python)](https://www.python.org/)
 
 ---
-
-## 🛡️ About Appsecco
-
-**Appsecco** is a leading cybersecurity company specializing in professional security testing, penetration testing, and security assessments. Our MCP Client PST tool is part of our comprehensive security toolkit designed for security researchers, penetration testers, and security professionals.
 
 ### 🌟 Key Features
 
@@ -132,6 +128,11 @@ When using the `--start-proxy` flag, the tool creates a professional security te
 
 ---
 
+## 🛡️ About Appsecco - TBD
+
+**Appsecco** is a leading cybersecurity company specializing in professional security testing, penetration testing, and security assessments. Our MCP Client PST tool is part of our comprehensive security toolkit designed for security researchers, penetration testers, and security professionals.
+
+
 ## 🏢 Professional Services
 
 **Appsecco** provides comprehensive cybersecurity services:
@@ -141,17 +142,13 @@ When using the `--start-proxy` flag, the tool creates a professional security te
 - **🏗️ Infrastructure Security Audits**
 - **☁️ Cloud Security Assessments**
 - **🔴 Red Team Operations**
-- **📚 Security Training & Awareness**
-- **📋 Compliance & Regulatory Support**
-- **🚨 Incident Response & Forensics**
-- **🏛️ Security Architecture Design**
 
 ---
 
 ## 📞 Contact & Support
 
 - **🌐 Website**: [https://appsecco.com](https://appsecco.com)
-- **📧 Email**: [info@appsecco.com](mailto:info@appsecco.com)
+- **📧 Email**: [HackMyProduct@appsecco.com](mailto:hackmyproduct@appsecco.com)
 - **📱 LinkedIn**: [https://linkedin.com/company/appsecco](https://linkedin.com/company/appsecco)
 - **🐦 Twitter**: [@appsecco](https://twitter.com/appsecco)
 
@@ -165,6 +162,6 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## 🙏 Acknowledgments
 
-Built with ❤️ by the **Appsecco Security Team** for the cybersecurity community.
+Built with ❤️ by the **Riyaz & Akash** for the cybersecurity community.
 
-**Appsecco - Your Trusted Security Partner** 🛡️
+**Appsecco - Let Us Hack Your Product Like Attackers Do** 🛡️

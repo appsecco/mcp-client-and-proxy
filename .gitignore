@@ -1,3 +1,4 @@
 mcp_config copy.old
 video-script.txt
-__pycache__/new_banner.py
+__pycache__
+new_banner.py
