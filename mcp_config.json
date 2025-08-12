@@ -1,0 +1,17 @@
+{
+    "mcpServers": {
+      "acme-industries-mcp": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@example/mcp"
+    ]
+    },
+    "hackernews-mcp": {
+      "command": "node",
+      "args": [
+        "/path/to/hackernews-mcp/build/index.js"
+      ]
+    }
+  }
+}

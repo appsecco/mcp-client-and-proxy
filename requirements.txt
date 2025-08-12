@@ -1,0 +1,5 @@
+# HTTP client dependency for proxy communication
+requests>=2.25.0
+
+# Standard library modules used:
+# json, subprocess, sys, time, typing, threading, queue, argparse, os 
