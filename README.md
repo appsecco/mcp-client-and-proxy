@@ -8,7 +8,7 @@
 
 ---
 
-### 🌟 Key Features
+## 🌟 Key Features
 
 - **🔍 Advanced MCP Server Integration** - Connect to any MCP server with professional-grade reliability
 - **🌐 Enterprise Proxy Support** - Seamless integration with Burp Suite and other security tools
@@ -20,7 +20,7 @@
 
 ## 🚀 What This Tool Does
 
-The **Appsecco MCP Client PST** is a professional security testing tool that provides:
+The **Appsecco MCP Client and Proxy** is a professional security testing tool that provides:
 
 1. **Local Relaying Proxy** - Start a local proxy server to route traffic through Burp Suite or other security tools
 2. **MCP Server Integration** - Connect to MCP servers defined in `mcp_config.json` and interact with their tools
@@ -85,7 +85,7 @@ usage: app.py [-h] [--config CONFIG] [--proxy PROXY] [--start-proxy]
               [--proxy-port PROXY_PORT] [--no-burp] [--no-proxychains]
               [--no-ssl-bypass]
 
-Appsecco MCP Client PST - Professional Security Testing Tool with proxychains support
+Appsecco MCP Client and Proxy - Professional Security Testing Tool with proxychains support
 
 options:
   -h, --help            show this help message and exit
@@ -102,7 +102,7 @@ options:
 
 Example: python app.py --start-proxy
 
-Brought to you by Appsecco - Your Trusted Security Partner
+Brought to you by Appsecco - Product Security Experts
 ```
 
 ---
@@ -128,29 +128,30 @@ When using the `--start-proxy` flag, the tool creates a professional security te
 
 ---
 
-## 🛡️ About Appsecco - TBD
+## 🛡️ About Appsecco - Let Us Hack Your Product Like Attackers Do 🛡️
 
-**Appsecco** is a leading cybersecurity company specializing in professional security testing, penetration testing, and security assessments. Our MCP Client PST tool is part of our comprehensive security toolkit designed for security researchers, penetration testers, and security professionals.
+**Appsecco** is a leading cybersecurity company specializing in product security testing, penetration testing, and security assessments. At Appsecco we hack your product and Cloud/K8s infra like hackers do. Real security testing for business-critical applications.
 
+We wrote this MCP Client and Proxy tool when we had to testing the security of MCP server of a Fortune 500 FinTech company. It worked well for our Burp Suite workflow. We felt that there could be others who may need this as well.
 
-## 🏢 Professional Services
+## 🏢 Product Security Testing
 
 **Appsecco** provides comprehensive cybersecurity services:
 
-- **🔍 Penetration Testing & Security Assessments**
+- **🔍 Penetration Testing & Security Assessments for Business-critical Products**
 - **🛡️ Application Security Testing**
 - **🏗️ Infrastructure Security Audits**
 - **☁️ Cloud Security Assessments**
-- **🔴 Red Team Operations**
 
 ---
 
 ## 📞 Contact & Support
 
+While this tool is offered under an open source MIT license, if you are interested in taking a look at our services. Here are the details.
+
 - **🌐 Website**: [https://appsecco.com](https://appsecco.com)
 - **📧 Email**: [HackMyProduct@appsecco.com](mailto:hackmyproduct@appsecco.com)
 - **📱 LinkedIn**: [https://linkedin.com/company/appsecco](https://linkedin.com/company/appsecco)
-- **🐦 Twitter**: [@appsecco](https://twitter.com/appsecco)
 
 ---
 
@@ -162,6 +163,6 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## 🙏 Acknowledgments
 
-Built with ❤️ by the **Riyaz & Akash** for the cybersecurity community.
+Built with ❤️ by the **[Riyaz](https://github.com/riyazwalikar) & [Akash](https://github.com/makash)** for the cybersecurity community.
 
 **Appsecco - Let Us Hack Your Product Like Attackers Do** 🛡️
