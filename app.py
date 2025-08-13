@@ -38,7 +38,6 @@ APPSECCO_ASCII_ART = """
 """
 
 APPSECCO_BANNER = """
-    ╔══════════════════════════════════════════════════════════════════════════════╗
       ###    ########  ########   ######  ########  ######   ######   ####### 
      ## ##   ##     ## ##     ## ##    ## ##       ##    ## ##    ## ##     ##
     ##   ##  ##     ## ##     ## ##       ##       ##       ##       ##     ##
@@ -46,22 +45,19 @@ APPSECCO_BANNER = """
    ######### ##        ##              ## ##       ##       ##       ##     ##
    ##     ## ##        ##        ##    ## ##       ##    ## ##    ## ##     ##
    ##     ## ##        ##         ######  ########  ######   ######   ####### 
-               ║
-    ║                                                                              ║
-    ║                   ╔══════════════════════════════════════════════════════╗   ║
-    ║                   ║        MCP CLIENT AND PROXY                          ║   ║
-    ║                   ║      A generic MCP client with ability to            ║   ║
-    ║                   ║           send traffic to Burp Suite                 ║   ║
-    ║                   ║           Version {version} - {build}                ║   ║
-    ║                   ╚══════════════════════════════════════════════════════╝   ║
-    ║                                                                              ║
-    ║  🛠️   Built for pentesting MCP servers using STDIO transport                  ║
-    ║  🎯   Aimed at folks who use Burp Suite for their app testing workflows       ║
-    ║  💻   Vibe coded, MIT License, not meant for production use                   ║
-    ║                                                                               ║
-    ║  📧   Email: HackMyProduct@appsecco.com | 🌐 Website: https://appsecco.com    ║
-    ║                                                                              ║
+
+    ╔══════════════════════════════════════════════════════════════════════════════╗
+    ║        MCP CLIENT AND PROXY                                                  ║
+    ║      A generic MCP client with ability to                                    ║
+    ║           send traffic to Burp Suite                                         ║
+    ║           Version {version} - {build}                ║
     ╚══════════════════════════════════════════════════════════════════════════════╝
+
+    🛠️   Built for pentesting MCP servers using STDIO transport
+    🎯   Aimed at folks who use Burp Suite for their app testing workflows
+    💻   Vibe coded, MIT License, not meant for production use
+
+    📧   Email: HackMyProduct@appsecco.com | 🌐 Website: https://appsecco.com
 """.format(version=APPSECCO_VERSION, build=APPSECCO_BUILD)
 
 # Appsecco Tagline
