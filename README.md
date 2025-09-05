@@ -163,6 +163,6 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## 🙏 Acknowledgments
 
-Built with ❤️ by the **[Riyaz](https://github.com/riyazwalikar) & [Akash](https://github.com/makash)** for the cybersecurity community.
+Built with ❤️ by **[Riyaz](https://github.com/riyazwalikar) & [Akash](https://github.com/makash)** for the cybersecurity community.
 
 **Appsecco - Let Us Hack Your Product Like Attackers Do** 🛡️
