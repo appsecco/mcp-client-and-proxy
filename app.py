@@ -38,26 +38,29 @@ APPSECCO_ASCII_ART = """
 """
 
 APPSECCO_BANNER = """
-      ###    ########  ########   ######  ########  ######   ######   ####### 
-     ## ##   ##     ## ##     ## ##    ## ##       ##    ## ##    ## ##     ##
-    ##   ##  ##     ## ##     ## ##       ##       ##       ##       ##     ##
-   ##     ## ########  ########   ######  ######   ##       ##       ##     ##
-   ######### ##        ##              ## ##       ##       ##       ##     ##
-   ##     ## ##        ##        ##    ## ##       ##    ## ##    ## ##     ##
-   ##     ## ##        ##         ######  ########  ######   ######   ####### 
+╔══════════════════════════════════════════════════════════════════════════════╗
+║                                                                              ║
+║     ###    ########  ########   ######  ########  ######   ######   #######  ║
+║    ## ##   ##     ## ##     ## ##    ## ##       ##    ## ##    ## ##     ## ║
+║   ##   ##  ##     ## ##     ## ##       ##       ##       ##       ##     ## ║    
+║  ##     ## ########  ########   ######  ######   ##       ##       ##     ## ║
+║  ######### ##        ##              ## ##       ##       ##       ##     ## ║
+║  ##     ## ##        ##        ##    ## ##       ##    ## ##    ## ##     ## ║
+║  ##     ## ##        ##         ######  ########  ######   ######   #######  ║
+║                                                                              ║
+║                                                                              ║
+║      MCP CLIENT AND PROXY                                                    ║
+║      A generic MCP client with ability to proxy MCP server traffic to your   ║
+║      Burp Suite for inspection.                                              ║
+║                                                                              ║
+║      Version {version} - {build}                              ║
+╚══════════════════════════════════════════════════════════════════════════════╝
 
-    ╔══════════════════════════════════════════════════════════════════════════════╗
-    ║        MCP CLIENT AND PROXY                                                  ║
-    ║      A generic MCP client with ability to                                    ║
-    ║           send traffic to Burp Suite                                         ║
-    ║           Version {version} - {build}                ║
-    ╚══════════════════════════════════════════════════════════════════════════════╝
+    🛠️  Built for pentesting MCP servers using STDIO transport
+    🎯  Aimed at folks who use Burp Suite for their app testing workflows
+    💻  Vibe coded, MIT License, not meant for production use
 
-    🛠️   Built for pentesting MCP servers using STDIO transport
-    🎯   Aimed at folks who use Burp Suite for their app testing workflows
-    💻   Vibe coded, MIT License, not meant for production use
-
-    📧   Email: HackMyProduct@appsecco.com | 🌐 Website: https://appsecco.com
+    📧  Email: HackMyProduct@appsecco.com | 🌐 Website: https://appsecco.com
 """.format(version=APPSECCO_VERSION, build=APPSECCO_BUILD)
 
 # Appsecco Tagline
@@ -1036,7 +1039,11 @@ def main():
     """Main entry point for Appsecco MCP Client PST"""
     parser = argparse.ArgumentParser(
         description="Appsecco MCP Client PST - Professional Security Testing Tool with proxychains support",
-        epilog="Example: python app.py --start-proxy\n\nBrought to you by Appsecco - Your Trusted Security Partner"
+        epilog="""Example: python app.py --start-proxy
+
+
+Brought to you by Appsecco - Your Trusted Security Partner""",
+        formatter_class=argparse.RawDescriptionHelpFormatter
     )
     parser.add_argument("--config", "-c", default="mcp_config.json", 
                        help="MCP configuration file (default: mcp_config.json)")
