@@ -69,7 +69,7 @@ The tool will automatically detect if `proxychains` is installed and provide ins
 python3 app.py --start-proxy
 
 # Use custom configuration file
-python3 app.py --config my_config.json --start-proxy
+python3 app.py --config my_mcp_config.json --start-proxy
 
 # Disable Burp proxy routing
 python3 app.py --no-burp
@@ -81,7 +81,7 @@ python3 app.py --no-proxychains
 ### Advanced Options
 
 ```bash
-usage: app.py [-h] [--config CONFIG] [--proxy PROXY] [--start-proxy] 
+usage: python3 app.py [-h] [--config CONFIG] [--proxy PROXY] [--start-proxy] 
               [--proxy-port PROXY_PORT] [--no-burp] [--no-proxychains]
               [--no-ssl-bypass]
 
@@ -100,7 +100,7 @@ options:
   --no-proxychains      Disable proxychains usage
   --no-ssl-bypass       Disable SSL certificate bypass
 
-Example: python app.py --start-proxy
+Example: python3 app.py --start-proxy
 
 Brought to you by Appsecco - Product Security Experts
 ```
@@ -113,17 +113,17 @@ When using the `--start-proxy` flag, the tool creates a professional security te
 
 ```
 1. 🚀 Run the app: python3 app.py --start-proxy
-2. 🔧 MCP Server Starts (with proxychains if enabled)
+2. 🔧 MCP Server Starts with proxychains
 3. 🌐 Local Proxy Server Starts on port 3000
-4. 📡 App sends requests → Burp (port 8080) → Local Proxy (port 3000) → MCP Server (stdio)
+4. 📡 App sends requests -> Local Proxy (port 3000) -> Burp (port 8080) -> MCP Server (stdio)
 5. 🔗 MCP server via proxychains and Burp sends/receives data from backend server
-6. 📤 MCP Server responds → Local Proxy → Burp → App
+6. 📤 MCP Server responds -> Local Proxy -> Burp -> App
 ```
 
 ### Burp Suite Configuration
 
 1. Launch Burp Suite and set it to listen on port 8080 (localhost)
-2. Configure Burp to intercept traffic to `localhost:3000`
+2. Configure Burp to intercept traffic as usual. This traffic will be travelling to `localhost:3000` and backend APIs
 3. Use Burp's professional tools like Repeater, Intruder, and Scanner
 
 ---
