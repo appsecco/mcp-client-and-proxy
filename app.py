@@ -205,14 +205,20 @@ class MCPClient:
                 env.update(config_env)
             
             if self.bypass_ssl:
-                # SSL bypass variables (these will override config env vars if there are conflicts)
+                # SSL bypass variables (only set if not already defined in config)
                 ssl_bypass_vars = {
                     'NODE_TLS_REJECT_UNAUTHORIZED': '0',  # Node.js SSL bypass
                     'PYTHONHTTPSVERIFY': '0',  # Python SSL bypass
-                    'REQUESTS_CA_BUNDLE': '',  # Requests library SSL bypass
-                    'SSL_CERT_FILE': '',  # OpenSSL SSL bypass
-                    'CURL_CA_BUNDLE': '',  # cURL SSL bypass
                 }
+                
+                # Only set these to empty if they're not already defined in config
+                if 'REQUESTS_CA_BUNDLE' not in config_env:
+                    ssl_bypass_vars['REQUESTS_CA_BUNDLE'] = ''  # Requests library SSL bypass
+                if 'SSL_CERT_FILE' not in config_env:
+                    ssl_bypass_vars['SSL_CERT_FILE'] = ''  # OpenSSL SSL bypass
+                if 'CURL_CA_BUNDLE' not in config_env:
+                    ssl_bypass_vars['CURL_CA_BUNDLE'] = ''  # cURL SSL bypass
+                
                 env.update(ssl_bypass_vars)
                        
             self.process = subprocess.Popen(
@@ -226,6 +232,7 @@ class MCPClient:
             )
 
             print(f"✅ MCP server command to start: {cmd}")
+            print(f"✅ MCP server environment variables: {self.process.pid}")
             
             # Wait for the server to start and detect readiness
             if not self._wait_for_server_start():
@@ -771,7 +778,8 @@ class GenericMCPApp:
                         # print(f"✅ Sending request to MCP server via stdio: {request_str}")
                         mcp_process_ref.stdin.write(request_str)
                         mcp_process_ref.stdin.flush()
-                        
+                                               
+
                         if request["method"] == "notifications/initialized":
                             response = {"result": "initialized"}
                         else:
