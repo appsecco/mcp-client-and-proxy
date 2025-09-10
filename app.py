@@ -16,6 +16,7 @@ import time
 import threading
 import queue
 import requests
+import platform
 from typing import Dict, Any, List, Optional
 import argparse
 
@@ -134,7 +135,9 @@ class MCPClient:
     def _check_proxychains_installed(self) -> bool:
         """Check if proxychains is installed on the system"""
         try:
-            result = subprocess.run(['which', 'proxychains'], 
+            # Determine the correct proxychains command based on OS
+            proxychains_cmd = 'proxychains4' if platform.system() == 'Darwin' else 'proxychains'
+            result = subprocess.run(['which', proxychains_cmd], 
                                   capture_output=True, text=True, check=False)
             return result.returncode == 0
         except Exception:
@@ -168,9 +171,12 @@ class MCPClient:
             if self.use_proxychains:
                 if not self._check_proxychains_installed():
                     print("❌ proxychains is not installed. Please install it first.")
-                    print("   On Ubuntu/Debian: sudo apt-get install proxychains")
-                    print("   On CentOS/RHEL: sudo yum install proxychains")
-                    print("   On macOS: brew install proxychains-ng")
+                    if platform.system() == 'Darwin':
+                        print("   On macOS: brew install proxychains-ng")
+                        print("   Note: On macOS, proxychains is installed as 'proxychains4'")
+                    else:
+                        print("   On Ubuntu/Debian: sudo apt-get install proxychains")
+                        print("   On CentOS/RHEL: sudo yum install proxychains")
                     return False
                 
                 if not self._check_proxychains_config():
@@ -182,7 +188,9 @@ class MCPClient:
                 self._verify_proxychains_config()
                 
 
-                cmd = ['proxychains', self.command] + self.args
+                # Determine the correct proxychains command based on OS
+                proxychains_cmd = 'proxychains4' if platform.system() == 'Darwin' else 'proxychains'
+                cmd = [proxychains_cmd, self.command] + self.args
             else:
                 cmd = [self.command] + self.args
             
