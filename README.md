@@ -128,6 +128,11 @@ When using the `--start-proxy` flag, the tool creates a professional security te
 
 ---
 
+## Why did we build this universal MCP client
+
+[![Watch the video](https://imgs.kloudle.com/apsc-public/why-did-we-build-universal-mcp-client.png)](https://youtu.be/A3DpnyEfC4M)
+
+
 ## 🛡️ About Appsecco - Let Us Hack Your Product Like Attackers Do 🛡️
 
 **Appsecco** is a leading cybersecurity company specializing in product security testing, penetration testing, and security assessments. At Appsecco we hack your product and Cloud/K8s infra like hackers do. Real security testing for business-critical applications.
