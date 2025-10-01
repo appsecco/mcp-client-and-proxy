@@ -19,6 +19,7 @@ import requests
 import platform
 from typing import Dict, Any, List, Optional
 import argparse
+import logging
 from analytics import get_analytics
 
 # Appsecco Version Information
@@ -237,25 +238,27 @@ class MCPClient:
             # Wait for the server to start and detect readiness
             if not self._wait_for_server_start():
                 get_analytics().track_error("mcp_server_failed_to_start", {
-                    "server_name": self.server_config["name"],
-                    "server_type": self.server_config["type"],
-                    "server_command": self.command,
-                    "server_args": self.args,
+                    "server_config": self.server_config,
+                    "server_pid": self.process.pid
                 })
                 return False
             
 
+            # print(self.server_config)
             get_analytics().track_server_connected("mcp_server_started", {
-                "server_name": self.server_config["name"],
-                "server_type": self.server_config["type"],
-                "server_command": self.command,
-                "server_args": self.args,
+                "server_command": cmd,
+                "server_config": self.server_config,
                 "server_pid": self.process.pid
             })
+            # print("Im here 2")
             return True
                 
         except Exception as e:
             print(f"❌ Error starting MCP server: {e}")
+            get_analytics().track_error("mcp_server_failed_to_start", {
+                "server_command": cmd,
+                "server_config": self.server_config,
+            })
             return False
     
     def _check_output_for_indicators(self, output: str, stream_name: str = "output") -> Optional[bool]:
@@ -570,10 +573,21 @@ class MCPClient:
             if "result" in response and "tools" in response["result"]:
                 tools = response["result"]["tools"]
                 self.tools = {tool["name"]: tool for tool in tools}
+
+                get_analytics().track_feature_used("mcp_tools_listed", {
+                    "tools_count": len(tools),
+                    "tools_list": tools
+                })
+
                 return tools
             else:
                 print(f"❌ Failed to get tools: {response}")
+                get_analytics().track_error("mcp_tools_failed_to_list", {
+                    "response": response
+                })
                 return []
+
+            
                 
         except Exception as e:
             print(f"❌ Error listing tools: {e}")
@@ -632,6 +646,14 @@ class GenericMCPApp:
         self.bypass_ssl = bypass_ssl
         self.proxy_server = None
         self.proxy_thread = None
+
+        get_analytics().track_feature_used("mcp_client_initialized", {
+            "config_file": config_file,
+            "use_burp_proxy": use_burp_proxy,
+            "use_proxychains": use_proxychains,
+            "bypass_ssl": bypass_ssl,
+            "proxy_url": proxy_url
+        })
     
     def select_server(self) -> bool:
         """Let user select an MCP server"""
@@ -645,6 +667,12 @@ class GenericMCPApp:
         for i, server_name in enumerate(servers, 1):
             print(f"   {i}. {server_name}")
         
+
+        get_analytics().track_feature_used("mcp_servers_present", {
+            "server_names": servers
+        })
+
+
         while True:
             try:
                 choice = input(f"\nSelect server (1-{len(servers)}): ").strip()
@@ -903,6 +931,7 @@ class GenericMCPApp:
             for i, tool in enumerate(tools, 1):
                 print(f"   {i}. {tool['name']}: {tool.get('description', 'No description')}")
             
+            
             # Interactive menu
             while True:
                 print("\n" + "-"*60)
@@ -1068,6 +1097,12 @@ class GenericMCPApp:
 
 def main():
     """Main entry point for Appsecco MCP Client PST"""
+
+#     logging.basicConfig(
+#     level=logging.DEBUG,
+#     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+# )
+    
     parser = argparse.ArgumentParser(
         description="Appsecco MCP Client PST - Professional Security Testing Tool with proxychains support",
         epilog="""Example: python app.py --start-proxy
