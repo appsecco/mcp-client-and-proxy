@@ -400,7 +400,7 @@ class MCPClient:
     def stop_server(self):
         """Stop the MCP server process"""
 
-        get_analytics().track_session_end("mcp_server_stopped")
+        get_analytics().track_session_end()
         
         if self.process:
                     self.process.terminate()
@@ -960,6 +960,8 @@ class GenericMCPApp:
                     tools = self.client.list_tools()
                 elif choice == "4":
                     print("\n👋 Goodbye!")
+                    get_analytics().track_feature_used("mcp_client_exited")
+                    get_analytics().track_session_end()
                     break
                 elif choice == "5":
                     self._show_about_appsecco()
