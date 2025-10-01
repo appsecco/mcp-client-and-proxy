@@ -1,6 +1,6 @@
 """
 MCP Client Proxy Analytics Module
-Provides opt-in, privacy-focused analytics using PostHog
+Provides opt-out, privacy-focused analytics using PostHog
 """
 
 import os
@@ -13,6 +13,25 @@ from typing import Optional, Dict, Any
 from datetime import datetime
 from functools import wraps
 import logging
+
+# Import configuration
+try:
+    from analytics_config import (
+        POSTHOG_API_KEY,
+        POSTHOG_HOST,
+        ANALYTICS_ENABLED_BY_DEFAULT,
+        PRIVACY_NOTICE,
+        TRACKED_EVENTS,
+        INCLUDE_METADATA
+    )
+except ImportError:
+    # Fallback if config file doesn't exist
+    POSTHOG_API_KEY = 'phc_YOUR_POSTHOG_PROJECT_API_KEY_HERE'
+    POSTHOG_HOST = 'https://app.posthog.com'
+    ANALYTICS_ENABLED_BY_DEFAULT = True
+    PRIVACY_NOTICE = "📊 Anonymous analytics enabled (use --no-analytics to disable)"
+    TRACKED_EVENTS = {'session_start': True, 'session_end': True}
+    INCLUDE_METADATA = {'os_info': True, 'python_version': True}
 
 # Conditional import to make analytics optional
 try:
@@ -29,63 +48,66 @@ class MCPAnalytics:
     Privacy-focused analytics for MCP Client Proxy.
     
     Features:
-    - Opt-in by default (requires explicit enabling)
+    - Opt-out by default (can be disabled with --no-analytics)
     - Anonymous user tracking (no PII collected)
     - Session-based tracking
     - Graceful failure (never interrupts main functionality)
     """
     
-    # Default PostHog API key for MCP Client Proxy
-    # This is a project-specific key that only accepts data for this tool
-    DEFAULT_API_KEY = 'phc_yb1DOMUcKjOuY0kVNagZBJpfVr5Ct5d6dfCZbxO4h53'  # Replace with your actual key
-    HOST = 'https://us.i.posthog.com'
-    
     def __init__(self, 
                  api_key: Optional[str] = None,
-                 host: str = HOST,
+                 host: Optional[str] = None,
                  enabled: Optional[bool] = None,
-                 debug: bool = False):
+                 debug: bool = False,
+                 silent: bool = False):
         """
         Initialize the analytics module.
         
         Args:
-            api_key: PostHog project API key (defaults to built-in key)
-            host: PostHog host (default: cloud instance, can be self-hosted)
+            api_key: PostHog project API key (defaults to configured key)
+            host: PostHog host (defaults to configured host)
             enabled: Whether analytics is enabled (defaults to checking env vars)
             debug: Enable debug logging
+            silent: Don't print analytics notice
         """
         self.enabled = self._determine_if_enabled(enabled)
         self.debug = debug
+        self.silent = silent
         self.posthog = None
         self.session_id = str(uuid.uuid4())
         self.anonymous_id = self._generate_anonymous_id()
         
         if self.enabled and POSTHOG_AVAILABLE:
-            # Use provided key, environment variable, or default key
+            # Use provided key, environment variable, or configured key
             self.api_key = (
                 api_key or 
                 os.getenv('MCP_POSTHOG_API_KEY') or 
-                self.DEFAULT_API_KEY
+                POSTHOG_API_KEY
             )
             
-            if not self.api_key or self.api_key == 'phc_YOUR_POSTHOG_PROJECT_API_KEY_HERE':
-                logger.warning("Analytics enabled but no valid API key configured. Please set your PostHog API key.")
+            # Use provided host or configured host
+            self.host = host or POSTHOG_HOST
+            
+            if not self.api_key or 'YOUR' in self.api_key:
+                if self.debug:
+                    logger.warning("Analytics enabled but no valid API key configured.")
                 self.enabled = False
                 return
             
             try:
                 self.posthog = Posthog(
                     project_api_key=self.api_key,
-                    host=host,
+                    host=self.host,
                     debug=debug,
-                    # Disable automatic capturing to have full control
-                    autocapture=False,
-                    # Batch events for better performance
                     on_error=self._on_error
                 )
                 
                 # Register cleanup on exit
                 atexit.register(self._cleanup)
+                
+                # Show privacy notice if not silent
+                if not self.silent and self.enabled:
+                    print(PRIVACY_NOTICE)
                 
                 if self.debug:
                     logger.info(f"Analytics initialized (session: {self.session_id[:8]}...)")
@@ -96,7 +118,8 @@ class MCPAnalytics:
                 self.enabled = False
         
         elif self.enabled and not POSTHOG_AVAILABLE:
-            logger.info("Analytics enabled but PostHog library not installed. Run: pip install posthog")
+            if not self.silent:
+                logger.info("Analytics enabled but PostHog library not installed. Run: pip install posthog")
             self.enabled = False
     
     def _determine_if_enabled(self, enabled: Optional[bool]) -> bool:
@@ -114,8 +137,8 @@ class MCPAnalytics:
         if env_enabled is not None:
             return env_enabled.lower() in ('true', '1', 'yes', 'on')
         
-        # Default to enabled (opt-out)
-        return True
+        # Use configured default (opt-out by default)
+        return ANALYTICS_ENABLED_BY_DEFAULT
     
     def _generate_anonymous_id(self) -> str:
         """
