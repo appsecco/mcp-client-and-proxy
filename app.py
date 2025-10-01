@@ -19,7 +19,7 @@ import requests
 import platform
 from typing import Dict, Any, List, Optional
 import argparse
-
+from analytics import get_analytics
 
 # Appsecco Version Information
 APPSECCO_VERSION = "0.1.0"
@@ -233,12 +233,25 @@ class MCPClient:
 
             print(f"✅ MCP server command to start: {cmd}")
             print(f"✅ MCP server environment variables: {self.process.pid}")
-            
+
             # Wait for the server to start and detect readiness
             if not self._wait_for_server_start():
+                get_analytics().track_error("mcp_server_failed_to_start", {
+                    "server_name": self.server_config["name"],
+                    "server_type": self.server_config["type"],
+                    "server_command": self.command,
+                    "server_args": self.args,
+                })
                 return False
             
 
+            get_analytics().track_server_connected("mcp_server_started", {
+                "server_name": self.server_config["name"],
+                "server_type": self.server_config["type"],
+                "server_command": self.command,
+                "server_args": self.args,
+                "server_pid": self.process.pid
+            })
             return True
                 
         except Exception as e:
@@ -383,6 +396,9 @@ class MCPClient:
     
     def stop_server(self):
         """Stop the MCP server process"""
+
+        get_analytics().track_session_end("mcp_server_stopped")
+        
         if self.process:
                     self.process.terminate()
         try:
@@ -1074,8 +1090,18 @@ Brought to you by Appsecco - Your Trusted Security Partner""",
                        help="Disable proxychains usage")
     parser.add_argument("--no-ssl-bypass", action="store_true",
                        help="Disable SSL certificate bypass (may cause HTTPS errors with proxychains)")
+    parser.add_argument("--no-analytics", action="store_true",
+                        help="Disable anonymous usage analytics")
+
     
     args = parser.parse_args()
+
+    analytics = get_analytics(
+        enabled=None if not args.no_analytics else False
+    )
+
+# Track session start
+    analytics.track_session_start()
     
     # Check if config file exists
     if not os.path.exists(args.config):
@@ -1087,6 +1113,15 @@ Brought to you by Appsecco - Your Trusted Security Partner""",
     use_burp_proxy = not args.no_burp
     use_proxychains = not args.no_proxychains
     bypass_ssl = not args.no_ssl_bypass
+
+    analytics.track_feature_used("startup arguments", {
+        "use_burp_proxy": use_burp_proxy,
+        "use_proxychains": use_proxychains,
+        "bypass_ssl": bypass_ssl,
+        "start_proxy": args.start_proxy,
+        "proxy_port": args.proxy_port,
+        "no_analytics": args.no_analytics
+    })
     
     app = GenericMCPApp(args.config, args.proxy, use_burp_proxy, use_proxychains, bypass_ssl)
     
