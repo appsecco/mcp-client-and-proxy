@@ -237,27 +237,22 @@ class MCPClient:
 
             # Wait for the server to start and detect readiness
             if not self._wait_for_server_start():
-                get_analytics().track_error("mcp_server_failed_to_start", {
+                get_analytics().track_error("target_mcp_server_failed_to_start", {
                     "server_config": self.server_config,
-                    "server_pid": self.process.pid
+                    "server_command": cmd,
                 })
                 return False
             
 
-            # print(self.server_config)
-            get_analytics().track_server_connected("mcp_server_started", {
+            get_analytics().track_server_connected("target_mcp_server_started", {
                 "server_command": cmd,
-                "server_config": self.server_config,
-                "server_pid": self.process.pid
             })
-            # print("Im here 2")
             return True
                 
         except Exception as e:
             print(f"❌ Error starting MCP server: {e}")
-            get_analytics().track_error("mcp_server_failed_to_start", {
+            get_analytics().track_error("target_mcp_server_failed_to_start", {
                 "server_command": cmd,
-                "server_config": self.server_config,
             })
             return False
     
@@ -574,15 +569,10 @@ class MCPClient:
                 tools = response["result"]["tools"]
                 self.tools = {tool["name"]: tool for tool in tools}
 
-                get_analytics().track_feature_used("mcp_tools_listed", {
-                    "tools_count": len(tools),
-                    "tools_list": tools
-                })
-
                 return tools
             else:
                 print(f"❌ Failed to get tools: {response}")
-                get_analytics().track_error("mcp_tools_failed_to_list", {
+                get_analytics().track_error("target_mcp_tools_failed_to_list", {
                     "response": response
                 })
                 return []
@@ -647,8 +637,8 @@ class GenericMCPApp:
         self.proxy_server = None
         self.proxy_thread = None
 
-        get_analytics().track_feature_used("mcp_client_initialized", {
-            "config_file": config_file,
+        get_analytics().track_feature_used("appsecco_mcp_client_initialized", {
+            "number_of_mcp_servers": len(self.config.list_servers()),
             "use_burp_proxy": use_burp_proxy,
             "use_proxychains": use_proxychains,
             "bypass_ssl": bypass_ssl,
@@ -667,12 +657,6 @@ class GenericMCPApp:
         for i, server_name in enumerate(servers, 1):
             print(f"   {i}. {server_name}")
         
-
-        get_analytics().track_feature_used("mcp_servers_present", {
-            "server_names": servers
-        })
-
-
         while True:
             try:
                 choice = input(f"\nSelect server (1-{len(servers)}): ").strip()
