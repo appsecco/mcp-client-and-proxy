@@ -58,7 +58,7 @@ class MCPAnalytics:
                  api_key: Optional[str] = None,
                  host: Optional[str] = None,
                  enabled: Optional[bool] = None,
-                 debug: bool = False,
+                 debug: Optional[bool] = None,
                  silent: bool = False):
         """
         Initialize the analytics module.
@@ -67,15 +67,18 @@ class MCPAnalytics:
             api_key: PostHog project API key (defaults to configured key)
             host: PostHog host (defaults to configured host)
             enabled: Whether analytics is enabled (defaults to checking env vars)
-            debug: Enable debug logging
+            debug: Enable debug logging (defaults to checking env vars)
             silent: Don't print analytics notice
         """
         self.enabled = self._determine_if_enabled(enabled)
-        self.debug = debug
+        self.debug = self._determine_debug_mode(debug)
         self.silent = silent
         self.posthog = None
         self.session_id = str(uuid.uuid4())
         self.anonymous_id = self._generate_anonymous_id()
+        
+        if self.debug:
+            print(f"[Analytics Debug] Initializing - Enabled: {self.enabled}, Debug: {self.debug}")
         
         if self.enabled and POSTHOG_AVAILABLE:
             # Use provided key, environment variable, or configured key
@@ -88,9 +91,13 @@ class MCPAnalytics:
             # Use provided host or configured host
             self.host = host or POSTHOG_HOST
             
+            if self.debug:
+                print(f"[Analytics Debug] API Key: {self.api_key[:20] if self.api_key else 'NOT SET'}...")
+                print(f"[Analytics Debug] Host: {self.host}")
+            
             if not self.api_key or 'YOUR' in self.api_key:
                 if self.debug:
-                    logger.warning("Analytics enabled but no valid API key configured.")
+                    print("[Analytics Debug] No valid API key configured")
                 self.enabled = False
                 return
             
@@ -98,7 +105,7 @@ class MCPAnalytics:
                 self.posthog = Posthog(
                     project_api_key=self.api_key,
                     host=self.host,
-                    debug=debug,
+                    debug=self.debug,
                     on_error=self._on_error
                 )
                 
@@ -110,17 +117,30 @@ class MCPAnalytics:
                     print(PRIVACY_NOTICE)
                 
                 if self.debug:
-                    logger.info(f"Analytics initialized (session: {self.session_id[:8]}...)")
+                    print(f"[Analytics Debug] PostHog client initialized successfully")
+                    print(f"[Analytics Debug] Session ID: {self.session_id[:8]}...")
+                    print(f"[Analytics Debug] Anonymous ID: {self.anonymous_id}")
                     
             except Exception as e:
                 if self.debug:
-                    logger.error(f"Failed to initialize PostHog: {e}")
+                    print(f"[Analytics Debug] Failed to initialize PostHog: {e}")
                 self.enabled = False
         
         elif self.enabled and not POSTHOG_AVAILABLE:
             if not self.silent:
-                logger.info("Analytics enabled but PostHog library not installed. Run: pip install posthog")
+                print("Analytics enabled but PostHog library not installed. Run: pip install posthog")
             self.enabled = False
+        elif self.debug:
+            print(f"[Analytics Debug] Analytics disabled or PostHog not available")
+    
+    def _determine_debug_mode(self, debug: Optional[bool]) -> bool:
+        """Determine if debug mode should be enabled."""
+        if debug is not None:
+            return debug
+        
+        # Check environment variable for debug mode
+        env_debug = os.getenv('MCP_ANALYTICS_DEBUG', 'false').lower()
+        return env_debug in ('true', '1', 'yes', 'on')
     
     def _determine_if_enabled(self, enabled: Optional[bool]) -> bool:
         """Determine if analytics should be enabled based on environment and parameters."""
@@ -160,19 +180,26 @@ class MCPAnalytics:
     def _on_error(self, error: Exception, items: list):
         """Handle PostHog errors gracefully."""
         if self.debug:
-            logger.error(f"PostHog error: {error}")
+            print(f"[Analytics Debug] PostHog error: {error}")
+            print(f"[Analytics Debug] Failed items: {len(items) if items else 0}")
     
     def _cleanup(self):
         """Clean up and send final events on exit."""
         try:
+            if self.debug:
+                print("[Analytics Debug] Cleanup: Flushing remaining events...")
+            
             if self.enabled and self.posthog:
                 self.track_session_end()
                 # Ensure all events are sent
                 self.posthog.flush()
                 self.posthog.shutdown()
+                
+                if self.debug:
+                    print("[Analytics Debug] Cleanup: Events flushed and client shutdown")
         except Exception as e:
             if self.debug:
-                logger.error(f"Error during analytics cleanup: {e}")
+                print(f"[Analytics Debug] Error during analytics cleanup: {e}")
     
     def _safe_track(self, event_name: str, properties: Optional[Dict[str, Any]] = None):
         """
@@ -183,6 +210,8 @@ class MCPAnalytics:
             properties: Optional event properties
         """
         if not self.enabled or not self.posthog:
+            if self.debug:
+                print(f"[Analytics Debug] Skipping event '{event_name}' - Analytics disabled or not initialized")
             return
         
         try:
@@ -206,11 +235,13 @@ class MCPAnalytics:
             )
             
             if self.debug:
-                logger.debug(f"Tracked event: {event_name}")
+                print(f"[Analytics Debug] Tracked event: {event_name}")
+                if properties:
+                    print(f"[Analytics Debug]   Properties: {properties}")
                 
         except Exception as e:
             if self.debug:
-                logger.error(f"Failed to track event {event_name}: {e}")
+                print(f"[Analytics Debug] Failed to track event {event_name}: {e}")
     
     def _get_version(self) -> str:
         """Get the version of the MCP client proxy."""
@@ -227,9 +258,12 @@ class MCPAnalytics:
         
         self._safe_track('mcp_session_started', properties)
     
-    def track_session_end(self):
+    def track_session_end(self, event_name: Optional[str] = None):
         """Track the end of a session."""
-        self._safe_track('mcp_session_ended')
+        if event_name:
+            self._safe_track(event_name)
+        else:
+            self._safe_track('mcp_session_ended')
     
     def track_server_connected(self, server_name: str, server_type: Optional[str] = None):
         """Track successful server connection."""
@@ -336,6 +370,12 @@ def get_analytics(force_new: bool = False, **kwargs) -> MCPAnalytics:
         MCPAnalytics instance
     """
     global _analytics_instance
+    
+    # Check if debug should be enabled from environment
+    if 'debug' not in kwargs:
+        env_debug = os.getenv('MCP_ANALYTICS_DEBUG', 'false').lower()
+        if env_debug in ('true', '1', 'yes', 'on'):
+            kwargs['debug'] = True
     
     if _analytics_instance is None or force_new:
         _analytics_instance = MCPAnalytics(**kwargs)
