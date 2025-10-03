@@ -126,6 +126,15 @@ When using the `--start-proxy` flag, the tool creates a professional security te
 2. Configure Burp to intercept traffic as usual. This traffic will be travelling to `localhost:3000` and backend APIs
 3. Use Burp's professional tools like Repeater, Intruder, and Scanner
 
+## 📊 Analytics
+
+This tool includes anonymous usage analytics for Appsecco to obtain usage metrics 
+
+**What we track**: startup arguments, tool start and end, count of MCP servers, error rates and basic system info (OS, Python version)
+**What we DON'T track**: Personal data, URLs, testing targets, traffic, credentials  
+**Opt-out**: Use `--no-analytics` flag or set `MCP_ANALYTICS_DISABLED=true`
+
+You can use `export MCP_ANALYTICS_DEBUG=true` to see what analytics data is shared.
 ---
 
 ## Why did we build this universal MCP client
