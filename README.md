@@ -83,7 +83,7 @@ python3 app.py --no-proxychains
 ```bash
 usage: python3 app.py [-h] [--config CONFIG] [--proxy PROXY] [--start-proxy] 
               [--proxy-port PROXY_PORT] [--no-burp] [--no-proxychains]
-              [--no-ssl-bypass]
+              [--no-ssl-bypass] [--debug]
 
 Appsecco MCP Client and Proxy - Professional Security Testing Tool with proxychains support
 
@@ -99,6 +99,7 @@ options:
   --no-burp             Disable Burp proxy routing
   --no-proxychains      Disable proxychains usage
   --no-ssl-bypass       Disable SSL certificate bypass
+  --debug               Enable debug output for troubleshooting
 
 Example: python3 app.py --start-proxy
 
