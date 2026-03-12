@@ -218,7 +218,7 @@ class MCPClient:
                     'NODE_TLS_REJECT_UNAUTHORIZED': '0',  # Node.js SSL bypass
                     'PYTHONHTTPSVERIFY': '0',  # Python SSL bypass
                 }
-                
+
                 # Only set these to empty if they're not already defined in config
                 if 'REQUESTS_CA_BUNDLE' not in config_env:
                     ssl_bypass_vars['REQUESTS_CA_BUNDLE'] = ''  # Requests library SSL bypass
@@ -226,8 +226,17 @@ class MCPClient:
                     ssl_bypass_vars['SSL_CERT_FILE'] = ''  # OpenSSL SSL bypass
                 if 'CURL_CA_BUNDLE' not in config_env:
                     ssl_bypass_vars['CURL_CA_BUNDLE'] = ''  # cURL SSL bypass
-                
+
                 env.update(ssl_bypass_vars)
+
+            # Route Node.js (mcp-remote) traffic through Burp via env vars.
+            # proxychains hooks don't reliably intercept Node.js/libuv networking,
+            # so setting HTTP(S)_PROXY is the reliable way to get this traffic into Burp.
+            if self.use_burp_proxy and 'HTTP_PROXY' not in config_env:
+                env['HTTP_PROXY'] = self.proxy_url
+                env['http_proxy'] = self.proxy_url
+                env['HTTPS_PROXY'] = self.proxy_url
+                env['https_proxy'] = self.proxy_url
                        
             self.process = subprocess.Popen(
                 cmd,

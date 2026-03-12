@@ -1,3 +1,20 @@
+# Config (may contain credentials/tokens)
+mcp_config.json
 mcp_config copy.old
-__pycache__
+
+# Burp CA cert (machine-specific, may contain sensitive material)
+*.crt
+*.pem
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
 venv/
+.env
+
+# Node
+node_modules/
+
+# macOS
+.DS_Store
