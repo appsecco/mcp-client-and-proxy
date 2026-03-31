@@ -1,6 +1,7 @@
 # Config (may contain credentials/tokens)
 mcp_config.json
 mcp_config copy.old
+*.old
 
 # Burp CA cert (machine-specific, may contain sensitive material)
 *.crt

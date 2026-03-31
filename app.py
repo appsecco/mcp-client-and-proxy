@@ -478,7 +478,17 @@ class MCPClient:
                 timeout = 5
             else:
                 timeout = 30
-            if self.use_burp_proxy:
+
+            # Determine if the target is a local proxy server (localhost/127.0.0.1)
+            # Burp cannot reliably forward requests to localhost — it returns HTML
+            # error pages instead. The actual MCP traffic to the remote server is
+            # already captured by proxy-bootstrap.js via undici ProxyAgent, so
+            # skipping Burp for localhost requests loses no visibility.
+            from urllib.parse import urlparse
+            target_host = urlparse(self.base_url).hostname or ""
+            is_local_target = target_host in ("localhost", "127.0.0.1", "::1")
+
+            if self.use_burp_proxy and not is_local_target:
                 # Route through Burp proxy for inspection
                 proxies = {
                     "http": self.proxy_url,
@@ -493,8 +503,11 @@ class MCPClient:
                     timeout=timeout
                 )
             else:
-                # Direct connection to local http server
-                self._debug_print(f"🔍 [DEBUG] Making POST request without proxy")
+                # Direct connection — local target or Burp proxy disabled
+                if is_local_target and self.use_burp_proxy:
+                    self._debug_print(f"🔍 [DEBUG] Skipping Burp proxy for localhost target (Burp can't forward to localhost)")
+                else:
+                    self._debug_print(f"🔍 [DEBUG] Making POST request without proxy")
                 response = requests.post(
                     f"{self.base_url}/mcp",
                     json=request,
@@ -1190,51 +1203,101 @@ class GenericMCPApp:
         print("   • Security Architecture Design")
         print("="*80)
     
+    def _resolve_param_type(self, param_info: Dict[str, Any]) -> tuple:
+        """Resolve parameter type and nullability from schema, handling anyOf.
+
+        Returns (type_str, is_nullable) e.g. ("string", True), ("array", False)
+        """
+        # Direct type field
+        if "type" in param_info:
+            return (param_info["type"], False)
+
+        # anyOf: pick the non-null type
+        if "anyOf" in param_info:
+            types = param_info["anyOf"]
+            is_nullable = any(t.get("type") == "null" for t in types)
+            for t in types:
+                if t.get("type") != "null":
+                    return (t.get("type", "string"), is_nullable)
+
+        return ("string", False)
+
+    def _coerce_value(self, raw: str, param_type: str, is_nullable: bool):
+        """Coerce a raw string input to the expected schema type."""
+        if not raw:
+            return None if is_nullable else raw
+
+        if param_type == "array":
+            # Comma-separated values → list
+            return [item.strip() for item in raw.split(",")]
+        elif param_type == "integer":
+            return int(raw)
+        elif param_type == "number":
+            return float(raw)
+        elif param_type == "boolean":
+            return raw.lower() in ("true", "1", "yes")
+        elif param_type == "null":
+            return None
+
+        # string or unknown
+        return raw
+
     def _get_tool_arguments_and_call(self, tool: Dict[str, Any]):
         """Get tool arguments and call the tool"""
         tool_name = tool["name"]
         input_schema = tool.get("inputSchema", {})
         properties = input_schema.get("properties", {})
         required = input_schema.get("required", [])
-        
+
         print(f"\n🔧 Calling tool: {tool_name}")
         print(f"Description: {tool.get('description', 'No description')}")
-        
+
         arguments = {}
-        
+
         # Get required arguments first
         for param_name in required:
             if param_name in properties:
                 param_info = properties[param_name]
                 description = param_info.get("description", "")
-                param_type = param_info.get("type", "string")
-                
+                param_type, is_nullable = self._resolve_param_type(param_info)
+
                 print(f"\nRequired parameter: {param_name}")
                 if description:
                     print(f"Description: {description}")
-                print(f"Type: {param_type}")
-                
-                value = input(f"Enter value for {param_name}: ").strip()
+                type_hint = param_type
+                if is_nullable:
+                    type_hint += " or null"
+                if param_type == "array":
+                    type_hint += " (comma-separated)"
+                print(f"Type: {type_hint}")
+
+                nullable_hint = " (or press Enter for null)" if is_nullable else ""
+                value = input(f"Enter value for {param_name}{nullable_hint}: ").strip()
                 if value:
-                    arguments[param_name] = value
+                    arguments[param_name] = self._coerce_value(value, param_type, is_nullable)
+                elif is_nullable:
+                    arguments[param_name] = None
                 else:
                     print(f"❌ {param_name} is required")
                     return
-        
+
         # Get optional arguments
         for param_name, param_info in properties.items():
             if param_name not in required:
                 description = param_info.get("description", "")
-                param_type = param_info.get("type", "string")
-                
+                param_type, is_nullable = self._resolve_param_type(param_info)
+
                 print(f"\nOptional parameter: {param_name}")
                 if description:
                     print(f"Description: {description}")
-                print(f"Type: {param_type}")
-                
+                type_hint = param_type
+                if param_type == "array":
+                    type_hint += " (comma-separated)"
+                print(f"Type: {type_hint}")
+
                 value = input(f"Enter value for {param_name} (or press Enter to skip): ").strip()
                 if value:
-                    arguments[param_name] = value
+                    arguments[param_name] = self._coerce_value(value, param_type, is_nullable)
         
         # Call the tool
         print(f"\n🚀 Calling {tool_name} with arguments: {json.dumps(arguments, indent=2)}")
