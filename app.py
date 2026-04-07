@@ -113,7 +113,7 @@ class MCPClient:
     def __init__(self, server_config: Dict[str, Any], proxy_url: str = "http://127.0.0.1:8080", use_proxychains: bool = True, bypass_ssl: bool = True, debug: bool = False):
         """
         Initialize the Appsecco MCP Client and Proxy
-        
+
         Args:
             server_config: Server configuration from mcp_config.json
             proxy_url: HTTP proxy URL for Burp inspection
@@ -124,6 +124,7 @@ class MCPClient:
         self.server_config = server_config
         self.command = server_config.get("command", "")
         self.args = server_config.get("args", [])
+        self.remote_url = server_config.get("url", "")  # Direct remote MCP URL
         self.process = None
         self.request_id = 1
         self.tools = {}
@@ -134,6 +135,22 @@ class MCPClient:
         self.use_proxychains = use_proxychains
         self.bypass_ssl = bypass_ssl
         self.debug = debug
+        self.connection_mode = self._detect_connection_mode()
+
+    def _detect_connection_mode(self) -> str:
+        """
+        Detect the connection mode based on server configuration.
+
+        Returns:
+            'direct-remote' - URL only, no subprocess needed
+            'mcp-remote'    - uses npx mcp-remote, subprocess with short wait
+            'stdio'         - local stdio MCP server, subprocess with full wait
+        """
+        if self.remote_url and not self.command:
+            return "direct-remote"
+        if "mcp-remote" in self.args:
+            return "mcp-remote"
+        return "stdio"
     
     def _debug_print(self, *args, **kwargs):
         """Print debug message if debug mode is enabled"""
@@ -173,7 +190,17 @@ class MCPClient:
             return False
     
     def start_server(self) -> bool:
-        """Start the MCP server process"""
+        """Start the MCP server process (or connect directly for remote MCPs)"""
+
+        if self.connection_mode == "direct-remote":
+            print(f"🌐 Direct remote MCP server: {self.remote_url}")
+            print(f"   No subprocess needed — will connect via HTTP directly")
+            self.base_url = self.remote_url.rstrip("/")
+            get_analytics().track_server_connected("target_mcp_server_direct_remote", {
+                "remote_url": self.remote_url,
+            })
+            return True
+
         try:
             # Check proxychains if enabled
             if self.use_proxychains:
@@ -249,10 +276,13 @@ class MCPClient:
             )
 
             print(f"✅ MCP server command to start: {cmd}")
-            print(f"✅ MCP server environment variables: {self.process.pid}")
+            print(f"✅ MCP server process PID: {self.process.pid}")
 
             # Wait for the server to start and detect readiness
-            if not self._wait_for_server_start():
+            # mcp-remote only needs a short wait (bootstrapping npx), local stdio needs longer
+            wait_timeout = 5 if self.connection_mode == "mcp-remote" else 20
+            print(f"⏳ Waiting up to {wait_timeout}s for server to start ({self.connection_mode} mode)...")
+            if not self._wait_for_server_start(timeout=wait_timeout):
                 get_analytics().track_error("target_mcp_server_failed_to_start", {
                     "server_config": self.server_config,
                     "server_command": cmd,
@@ -389,17 +419,21 @@ class MCPClient:
             return False
     
     def stop_server(self):
-        """Stop the MCP server process"""
+        """Stop the MCP server process (no-op for direct remote MCPs)"""
 
         get_analytics().track_session_end()
-        
+
+        if self.connection_mode == "direct-remote":
+            self._debug_print("🔍 [DEBUG] Direct remote MCP — nothing to stop")
+            return
+
         if self.process:
-                    self.process.terminate()
-        try:
-            self.process.wait(timeout=5)
-        except subprocess.TimeoutExpired:
-            self.process.kill()
-        self.process = None
+            self.process.terminate()
+            try:
+                self.process.wait(timeout=5)
+            except subprocess.TimeoutExpired:
+                self.process.kill()
+            self.process = None
     
     def _check_proxy_server_connectivity(self) -> bool:
         """
@@ -456,16 +490,22 @@ class MCPClient:
             request["params"] = params
         
         # Debug: Log request details
+        target_url = self.base_url if self.connection_mode == "direct-remote" else f"{self.base_url}/mcp"
         self._debug_print(f"\n🔍 [DEBUG] Sending HTTP request:")
         self._debug_print(f"   Method: {method}")
-        self._debug_print(f"   URL: {self.base_url}/mcp")
+        self._debug_print(f"   URL: {target_url}")
+        self._debug_print(f"   Connection mode: {self.connection_mode}")
         self._debug_print(f"   Use Burp Proxy: {self.use_burp_proxy}")
         if self.use_burp_proxy:
             self._debug_print(f"   Proxy URL: {self.proxy_url}")
-            self._debug_print(f"   ⚠️  Note: Request will go through Burp proxy to reach {self.base_url}/mcp")
+            self._debug_print(f"   ⚠️  Note: Request will go through Burp proxy to reach {target_url}")
             self._debug_print(f"   💡 If Burp is intercepting, it may return HTML instead of forwarding to the proxy server")
         self._debug_print(f"   Request Body: {json.dumps(request, indent=2)}")
-        
+
+        # For direct-remote mode, send directly to the remote URL (no local proxy needed)
+        if self.connection_mode == "direct-remote":
+            return self._send_direct_remote_request(request, method)
+
         # Check proxy server connectivity
         if not self._check_proxy_server_connectivity():
             self._debug_print(f"⚠️  [DEBUG] Proxy server connectivity check failed")
@@ -601,6 +641,65 @@ class MCPClient:
             print(f"❌ Unexpected error in send_request: {e}")
             return self._send_stdio_request(method, params)
     
+    def _send_direct_remote_request(self, request: Dict[str, Any], method: str) -> Dict[str, Any]:
+        """
+        Send a JSON-RPC request directly to a remote MCP server via HTTP.
+        Used when connection_mode is 'direct-remote' (no subprocess).
+
+        Args:
+            request: The JSON-RPC request dict
+            method: The RPC method name (for timeout selection)
+
+        Returns:
+            Response from the remote server
+        """
+        timeout = 5 if method == "notifications/initialized" else 30
+
+        try:
+            if self.use_burp_proxy:
+                proxies = {
+                    "http": self.proxy_url,
+                    "https": self.proxy_url
+                }
+                self._debug_print(f"🔍 [DEBUG] Direct remote request via Burp proxy: {proxies}")
+            else:
+                proxies = None
+                self._debug_print(f"🔍 [DEBUG] Direct remote request (no proxy)")
+
+            response = requests.post(
+                self.base_url,
+                json=request,
+                proxies=proxies,
+                headers={"Content-Type": "application/json"},
+                timeout=timeout,
+                verify=not self.bypass_ssl
+            )
+
+            self._debug_print(f"\n🔍 [DEBUG] Remote HTTP Response:")
+            self._debug_print(f"   Status Code: {response.status_code}")
+            self._debug_print(f"   Response Text (first 500 chars): {response.text[:500]}")
+
+            # Check for HTML response (Burp interception)
+            content_type = response.headers.get('Content-Type', '').lower()
+            if 'text/html' in content_type or response.text.strip().startswith('<html'):
+                self._debug_print(f"\n⚠️  [DEBUG] Detected HTML response instead of JSON from remote MCP!")
+                raise RuntimeError(f"Received HTML response instead of JSON from {self.base_url}")
+
+            if response.status_code != 200:
+                raise RuntimeError(f"Remote MCP returned status {response.status_code}")
+
+            if not response.text or not response.text.strip():
+                # notifications/initialized may return empty body
+                if method == "notifications/initialized":
+                    return {"result": "initialized"}
+                raise RuntimeError(f"Empty response from remote MCP at {self.base_url}")
+
+            return response.json()
+
+        except requests.exceptions.RequestException as e:
+            print(f"❌ Direct remote request failed: {e}")
+            raise RuntimeError(f"Failed to reach remote MCP at {self.base_url}: {e}")
+
     def _send_stdio_request(self, method: str, params: Dict[str, Any] = None) -> Dict[str, Any]:
         """
         Fallback method: Send request directly via stdio
@@ -814,16 +913,16 @@ class GenericMCPApp:
             return False
         
         print(f"🚀 Appsecco MCP Client PST - Starting server: {self.current_server}")
+        print(f"   Connection mode: {self.client.connection_mode}")
         if not self.client.start_server():
             return False
-        
-        # Start proxy server first if requested
-        if start_proxy and self.client.process:
+
+        # Start proxy server if requested (not needed for direct-remote mode)
+        if self.client.connection_mode == "direct-remote":
+            print(f"🌐 Direct remote MCP — skipping local proxy server")
+        elif start_proxy and self.client.process:
             self._start_proxy_server(proxy_port)
-            
-            # Test proxy server connectivity
-            # self._test_proxy_connectivity(proxy_port)
-            
+
             # Give proxy server a moment to start
             import time
             time.sleep(1)
@@ -1087,7 +1186,10 @@ class GenericMCPApp:
             return
         
         # Display connection status after server is started
-        print(f"📡 Local HTTP server: {self.client.base_url if self.client else 'Not connected'}")
+        if self.client.connection_mode == "direct-remote":
+            print(f"📡 Remote MCP endpoint: {self.client.base_url}")
+        else:
+            print(f"📡 Local HTTP server: {self.client.base_url if self.client else 'Not connected'}")
         
         try:
             # List available tools
