@@ -16,6 +16,7 @@
 - **🛡️ SSL Bypass Support** - Advanced testing scenarios with certificate handling
 - **📊 Interactive Security Testing** - Professional interface for security assessments
 - **🔭 Full Traffic Visibility** - Intercept both local relay traffic AND backend MCP server HTTPS traffic in Burp
+- **🌍 Direct Remote MCP Support** - Connect to remote HTTP/SSE MCP servers directly via URL without needing `mcp-remote`
 
 ---
 
@@ -115,10 +116,39 @@ Brought to you by Appsecco - Product Security Experts
 
 ---
 
+## 🔄 Connection Modes
+
+The tool automatically detects three connection modes based on `mcp_config.json`:
+
+| Mode | Config | Subprocess? | Wait Time | Use Case |
+|---|---|---|---|---|
+| **stdio** | `command` + `args` (no `mcp-remote`) | Yes | 20s | Local MCP servers (e.g. `python server.py`) |
+| **mcp-remote** | `command: npx`, args include `mcp-remote` | Yes | 5s | Remote MCPs via the `mcp-remote` npm bridge |
+| **direct-remote** | `url` only (no `command`) | No | None | Remote HTTP/SSE MCP servers accessible via URL |
+
+### Direct Remote MCP Configuration
+
+For remote MCP servers that expose an HTTP endpoint directly, use the `url` key without `command`:
+
+```json
+{
+  "mcpServers": {
+    "my-remote-mcp": {
+      "url": "https://remote.example.com/mcp"
+    }
+  }
+}
+```
+
+No subprocess is spawned — the tool sends JSON-RPC requests directly to the URL. Traffic is routed through Burp (port 8080) by default for inspection, unless `--no-burp` is used.
+
+---
+
 ## 🔄 Data Flow with --start-proxy
 
 When using the `--start-proxy` flag, the tool creates a professional security testing environment:
 
+**stdio / mcp-remote mode:**
 ```
 1. 🚀 Run the app: python3 app.py --start-proxy
 2. 🔧 MCP Server Starts (with proxychains and HTTP_PROXY set)
@@ -126,6 +156,13 @@ When using the `--start-proxy` flag, the tool creates a professional security te
 4. 📡 App sends requests -> Local Proxy (port 3000) -> Burp (port 8080) -> MCP Server (stdio)
 5. 🔗 MCP server (mcp-remote) sends HTTPS requests -> Burp (port 8080) -> Remote MCP endpoint
 6. 📤 Remote MCP endpoint responds -> Burp -> MCP Server -> Local Proxy -> App
+```
+
+**direct-remote mode:**
+```
+1. 🚀 Run the app: python3 app.py (no --start-proxy needed)
+2. 📡 App sends JSON-RPC requests -> Burp (port 8080) -> Remote MCP endpoint
+3. 📤 Remote MCP endpoint responds -> Burp -> App
 ```
 
 ### Burp Suite Configuration
