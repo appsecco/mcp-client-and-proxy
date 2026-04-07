@@ -24,6 +24,7 @@ import hashlib
 import secrets
 import base64
 import webbrowser
+import httpx
 from urllib.parse import urlencode, urlparse, parse_qs
 from http.server import HTTPServer, BaseHTTPRequestHandler
 from analytics import get_analytics
@@ -147,6 +148,7 @@ class MCPClient:
         self.auth_headers = dict(server_config.get("headers", {}))
         self.oauth_access_token = None
         self.oauth_refresh_token = None
+        self.mcp_session_id = None  # Set by server during initialize response
 
     def _detect_connection_mode(self) -> str:
         """
@@ -166,11 +168,18 @@ class MCPClient:
     def _build_request_headers(self) -> Dict[str, str]:
         """Build HTTP headers for remote requests.
 
-        Merges Content-Type, static headers from config, and OAuth Bearer token.
+        Merges Content-Type, Accept, MCP session ID, static headers from config,
+        and OAuth Bearer token.
         Static headers take precedence; an OAuth token is added only when no
         Authorization header is already present.
         """
-        headers = {"Content-Type": "application/json"}
+        headers = {
+            "Content-Type": "application/json",
+            "Accept": "application/json, text/event-stream",
+        }
+        # MCP session ID (assigned by server during initialize)
+        if self.mcp_session_id:
+            headers["Mcp-Session-Id"] = self.mcp_session_id
         # Static headers from config (e.g. API keys, custom auth)
         headers.update(self.auth_headers)
         # OAuth token (only if no explicit Authorization header was configured)
@@ -667,10 +676,49 @@ class MCPClient:
             print(f"❌ Unexpected error in send_request: {e}")
             return self._send_stdio_request(method, params)
     
+    def _get_httpx_client(self) -> httpx.Client:
+        """Create an httpx client with HTTP/2 support and proxy/SSL settings."""
+        proxy_url = self.proxy_url if self.use_burp_proxy else None
+        return httpx.Client(
+            http2=True,
+            verify=not self.bypass_ssl,
+            proxy=proxy_url,
+        )
+
+    def _parse_response_body(self, text: str, content_type: str = "") -> Dict[str, Any]:
+        """Parse a response body that may be plain JSON or SSE (Server-Sent Events).
+
+        Remote MCP servers often respond with SSE format:
+            event: message
+            data: {"jsonrpc": "2.0", ...}
+
+        This method detects SSE and extracts the JSON from the data: line(s).
+        """
+        stripped = text.strip()
+
+        # Try plain JSON first
+        if stripped.startswith("{"):
+            return json.loads(stripped)
+
+        # SSE format: look for data: lines and concatenate their payloads
+        if "text/event-stream" in content_type.lower() or stripped.startswith("event:") or stripped.startswith("data:"):
+            self._debug_print(f"🔍 [DEBUG] Detected SSE response, extracting data lines")
+            data_parts = []
+            for line in stripped.splitlines():
+                if line.startswith("data:"):
+                    data_parts.append(line[5:].strip())
+            if data_parts:
+                combined = "".join(data_parts)
+                self._debug_print(f"🔍 [DEBUG] SSE data payload: {combined[:300]}")
+                return json.loads(combined)
+
+        # Fallback: try parsing the whole thing
+        return json.loads(stripped)
+
     def _send_direct_remote_request(self, request: Dict[str, Any], method: str) -> Dict[str, Any]:
         """
-        Send a JSON-RPC request directly to a remote MCP server via HTTP.
-        Used when connection_mode is 'direct-remote' (no subprocess).
+        Send a JSON-RPC request directly to a remote MCP server via HTTP/2.
+        Uses httpx for HTTP/2 support (required when proxying through Burp).
         Handles 401 responses by attempting MCP OAuth 2.1 flow.
 
         Args:
@@ -681,74 +729,70 @@ class MCPClient:
             Response from the remote server
         """
         timeout = 5 if method == "notifications/initialized" else 30
-
-        if self.use_burp_proxy:
-            proxies = {
-                "http": self.proxy_url,
-                "https": self.proxy_url
-            }
-            self._debug_print(f"🔍 [DEBUG] Direct remote request via Burp proxy: {proxies}")
-        else:
-            proxies = None
-            self._debug_print(f"🔍 [DEBUG] Direct remote request (no proxy)")
-
         headers = self._build_request_headers()
 
+        self._debug_print(f"🔍 [DEBUG] Direct remote request (HTTP/2 enabled)")
+        self._debug_print(f"   Burp proxy: {self.proxy_url if self.use_burp_proxy else 'disabled'}")
+
         try:
-            response = requests.post(
-                self.base_url,
-                json=request,
-                proxies=proxies,
-                headers=headers,
-                timeout=timeout,
-                verify=not self.bypass_ssl
-            )
+            with self._get_httpx_client() as client:
+                response = client.post(
+                    self.base_url,
+                    json=request,
+                    headers=headers,
+                    timeout=timeout,
+                )
 
-            self._debug_print(f"\n🔍 [DEBUG] Remote HTTP Response:")
-            self._debug_print(f"   Status Code: {response.status_code}")
-            self._debug_print(f"   Response Text (first 500 chars): {response.text[:500]}")
+                self._debug_print(f"\n🔍 [DEBUG] Remote HTTP Response:")
+                self._debug_print(f"   HTTP version: {response.http_version}")
+                self._debug_print(f"   Status Code: {response.status_code}")
+                self._debug_print(f"   Response Text (first 500 chars): {response.text[:500]}")
 
-            # Handle 401 — attempt OAuth flow, then retry once
-            if response.status_code == 401:
-                www_auth = response.headers.get("WWW-Authenticate", "")
-                self._debug_print(f"🔐 [DEBUG] Received 401. WWW-Authenticate: {www_auth}")
+                # Handle 401 — attempt OAuth flow, then retry once
+                if response.status_code == 401:
+                    www_auth = response.headers.get("WWW-Authenticate", "")
+                    self._debug_print(f"🔐 [DEBUG] Received 401. WWW-Authenticate: {www_auth}")
 
-                if self._perform_oauth_flow(www_auth, proxies):
-                    # Retry with the fresh token
-                    headers = self._build_request_headers()
-                    response = requests.post(
-                        self.base_url,
-                        json=request,
-                        proxies=proxies,
-                        headers=headers,
-                        timeout=timeout,
-                        verify=not self.bypass_ssl
-                    )
-                    self._debug_print(f"🔍 [DEBUG] Retry after OAuth — status {response.status_code}")
-                else:
-                    raise RuntimeError(
-                        f"Remote MCP returned 401 and OAuth flow failed or was not available. "
-                        f"Provide an Authorization header in the config or ensure the server supports MCP OAuth."
-                    )
+                    if self._perform_oauth_flow(www_auth):
+                        # Retry with the fresh token
+                        headers = self._build_request_headers()
+                        response = client.post(
+                            self.base_url,
+                            json=request,
+                            headers=headers,
+                            timeout=timeout,
+                        )
+                        self._debug_print(f"🔍 [DEBUG] Retry after OAuth — status {response.status_code}")
+                    else:
+                        raise RuntimeError(
+                            f"Remote MCP returned 401 and OAuth flow failed or was not available. "
+                            f"Provide an Authorization header in the config or ensure the server supports MCP OAuth."
+                        )
 
-            # Check for HTML response (Burp interception)
-            content_type = response.headers.get('Content-Type', '').lower()
-            if 'text/html' in content_type or response.text.strip().startswith('<html'):
-                self._debug_print(f"\n⚠️  [DEBUG] Detected HTML response instead of JSON from remote MCP!")
-                raise RuntimeError(f"Received HTML response instead of JSON from {self.base_url}")
+                # Capture MCP session ID from response headers
+                session_id = response.headers.get("Mcp-Session-Id")
+                if session_id:
+                    self.mcp_session_id = session_id
+                    self._debug_print(f"🔍 [DEBUG] Captured Mcp-Session-Id: {session_id}")
 
-            if response.status_code != 200:
-                raise RuntimeError(f"Remote MCP returned status {response.status_code}")
+                # Check for HTML response (Burp interception)
+                content_type = response.headers.get('Content-Type', '').lower()
+                if 'text/html' in content_type or response.text.strip().startswith('<html'):
+                    self._debug_print(f"\n⚠️  [DEBUG] Detected HTML response instead of JSON from remote MCP!")
+                    raise RuntimeError(f"Received HTML response instead of JSON from {self.base_url}")
 
-            if not response.text or not response.text.strip():
-                # notifications/initialized may return empty body
-                if method == "notifications/initialized":
-                    return {"result": "initialized"}
-                raise RuntimeError(f"Empty response from remote MCP at {self.base_url}")
+                if response.status_code != 200:
+                    raise RuntimeError(f"Remote MCP returned status {response.status_code}")
 
-            return response.json()
+                if not response.text or not response.text.strip():
+                    # notifications/initialized may return empty body
+                    if method == "notifications/initialized":
+                        return {"result": "initialized"}
+                    raise RuntimeError(f"Empty response from remote MCP at {self.base_url}")
 
-        except requests.exceptions.RequestException as e:
+                return self._parse_response_body(response.text, response.headers.get('Content-Type', ''))
+
+        except httpx.HTTPError as e:
             print(f"❌ Direct remote request failed: {e}")
             raise RuntimeError(f"Failed to reach remote MCP at {self.base_url}: {e}")
 
@@ -756,7 +800,7 @@ class MCPClient:
     # MCP OAuth 2.1 implementation (RFC 9728 discovery + PKCE flow)
     # ------------------------------------------------------------------
 
-    def _perform_oauth_flow(self, www_authenticate: str, proxies: Optional[Dict] = None) -> bool:
+    def _perform_oauth_flow(self, www_authenticate: str) -> bool:
         """
         Run the MCP OAuth 2.1 flow triggered by a 401 response.
 
@@ -779,14 +823,11 @@ class MCPClient:
             resource_metadata_url = f"{parsed.scheme}://{parsed.netloc}/.well-known/oauth-protected-resource{path}"
             self._debug_print(f"🔍 [DEBUG] No resource_metadata in header, trying well-known: {resource_metadata_url}")
 
-        req_kwargs = {"timeout": 10, "verify": not self.bypass_ssl}
-        if proxies:
-            req_kwargs["proxies"] = proxies
-
         # --- Step 2: Fetch Protected Resource Metadata ---
         try:
             self._debug_print(f"🔍 [DEBUG] Fetching resource metadata from: {resource_metadata_url}")
-            res = requests.get(resource_metadata_url, **req_kwargs)
+            with self._get_httpx_client() as client:
+                res = client.get(resource_metadata_url, timeout=10)
             if res.status_code != 200:
                 print(f"⚠️  Could not fetch resource metadata (HTTP {res.status_code})")
                 return False
@@ -806,13 +847,14 @@ class MCPClient:
         # --- Step 3: Fetch Authorization Server Metadata ---
         as_meta_url = f"{auth_server_base}/.well-known/oauth-authorization-server"
         try:
-            self._debug_print(f"🔍 [DEBUG] Fetching auth server metadata from: {as_meta_url}")
-            res = requests.get(as_meta_url, **req_kwargs)
-            if res.status_code != 200:
-                # Try OpenID Connect fallback
-                as_meta_url = f"{auth_server_base}/.well-known/openid-configuration"
-                self._debug_print(f"🔍 [DEBUG] Falling back to OIDC: {as_meta_url}")
-                res = requests.get(as_meta_url, **req_kwargs)
+            with self._get_httpx_client() as client:
+                self._debug_print(f"🔍 [DEBUG] Fetching auth server metadata from: {as_meta_url}")
+                res = client.get(as_meta_url, timeout=10)
+                if res.status_code != 200:
+                    # Try OpenID Connect fallback
+                    as_meta_url = f"{auth_server_base}/.well-known/openid-configuration"
+                    self._debug_print(f"🔍 [DEBUG] Falling back to OIDC: {as_meta_url}")
+                    res = client.get(as_meta_url, timeout=10)
             if res.status_code != 200:
                 print(f"⚠️  Could not fetch auth server metadata (HTTP {res.status_code})")
                 return False
@@ -838,7 +880,7 @@ class MCPClient:
 
         if not client_id and registration_endpoint:
             client_id = self._oauth_dynamic_registration(
-                registration_endpoint, redirect_uri, req_kwargs
+                registration_endpoint, redirect_uri
             )
 
         if not client_id:
@@ -854,7 +896,7 @@ class MCPClient:
         return self._oauth_authorization_code_flow(
             authorization_endpoint, token_endpoint,
             client_id, client_secret, redirect_uri, redirect_port,
-            resource_uri, scope_str, req_kwargs
+            resource_uri, scope_str
         )
 
     def _parse_www_authenticate(self, header: str) -> Optional[str]:
@@ -869,8 +911,7 @@ class MCPClient:
         return None
 
     def _oauth_dynamic_registration(self, registration_endpoint: str,
-                                     redirect_uri: str,
-                                     req_kwargs: Dict) -> Optional[str]:
+                                     redirect_uri: str) -> Optional[str]:
         """Attempt RFC 7591 Dynamic Client Registration. Returns client_id or None."""
         reg_body = {
             "client_name": "Appsecco MCP Client",
@@ -881,8 +922,9 @@ class MCPClient:
         }
         try:
             self._debug_print(f"🔍 [DEBUG] Attempting dynamic client registration at: {registration_endpoint}")
-            res = requests.post(registration_endpoint, json=reg_body,
-                                headers={"Content-Type": "application/json"}, **req_kwargs)
+            with self._get_httpx_client() as client:
+                res = client.post(registration_endpoint, json=reg_body,
+                                  headers={"Content-Type": "application/json"}, timeout=10)
             if res.status_code in (200, 201):
                 data = res.json()
                 cid = data.get("client_id")
@@ -898,8 +940,7 @@ class MCPClient:
     def _oauth_authorization_code_flow(self, auth_endpoint: str, token_endpoint: str,
                                         client_id: str, client_secret: str,
                                         redirect_uri: str, redirect_port: int,
-                                        resource_uri: str, scope: str,
-                                        req_kwargs: Dict) -> bool:
+                                        resource_uri: str, scope: str) -> bool:
         """
         Run the full OAuth 2.1 Authorization Code + PKCE flow.
         Opens the user's browser, waits for the callback, exchanges the code for a token.
@@ -994,9 +1035,10 @@ class MCPClient:
 
         try:
             self._debug_print(f"🔍 [DEBUG] Exchanging auth code at: {token_endpoint}")
-            res = requests.post(token_endpoint, data=token_data,
-                                headers={"Content-Type": "application/x-www-form-urlencoded"},
-                                **req_kwargs)
+            with self._get_httpx_client() as client:
+                res = client.post(token_endpoint, data=token_data,
+                                  headers={"Content-Type": "application/x-www-form-urlencoded"},
+                                  timeout=10)
             if res.status_code != 200:
                 print(f"❌ Token exchange failed (HTTP {res.status_code}): {res.text[:300]}")
                 return False
