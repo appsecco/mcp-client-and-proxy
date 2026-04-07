@@ -142,6 +142,61 @@ For remote MCP servers that expose an HTTP endpoint directly, use the `url` key 
 
 No subprocess is spawned — the tool sends JSON-RPC requests directly to the URL. Traffic is routed through Burp (port 8080) by default for inspection, unless `--no-burp` is used.
 
+### Authentication for Remote MCPs
+
+The tool supports two authentication mechanisms for direct-remote connections:
+
+**1. Static Headers (API keys, pre-obtained tokens)**
+
+Add a `headers` block to the server config:
+
+```json
+{
+  "mcpServers": {
+    "my-remote-mcp": {
+      "url": "https://remote.example.com/mcp",
+      "headers": {
+        "Authorization": "Bearer your-api-key-or-token"
+      }
+    }
+  }
+}
+```
+
+Any headers defined here are sent with every request. This works for API keys, static Bearer tokens, or any custom auth headers the server expects.
+
+**2. OAuth 2.1 (MCP spec compliant — automatic)**
+
+If the remote MCP server returns a `401 Unauthorized` with a `WWW-Authenticate: Bearer` header, the tool automatically initiates the [MCP OAuth 2.1 flow](https://modelcontextprotocol.io/specification/draft/basic/authorization):
+
+1. Discovers the Protected Resource Metadata (RFC 9728) via `/.well-known/oauth-protected-resource`
+2. Fetches Authorization Server Metadata (RFC 8414 / OpenID Connect discovery)
+3. Attempts Dynamic Client Registration (RFC 7591) if no `oauth_client_id` is configured
+4. Opens the user's browser for Authorization Code + PKCE login
+5. Exchanges the auth code for an access token and retries the request
+
+For servers that require a pre-registered OAuth client, add the client credentials to the config:
+
+```json
+{
+  "mcpServers": {
+    "my-oauth-mcp": {
+      "url": "https://remote.example.com/mcp",
+      "oauth_client_id": "your-client-id",
+      "oauth_client_secret": "your-client-secret"
+    }
+  }
+}
+```
+
+| Config Field | Required | Purpose |
+|---|---|---|
+| `headers` | No | Static HTTP headers sent with every request |
+| `oauth_client_id` | No | Pre-registered OAuth client ID (skips dynamic registration) |
+| `oauth_client_secret` | No | OAuth client secret (for confidential clients) |
+
+> **Note**: Static `headers` take precedence. If an `Authorization` header is set in `headers`, the OAuth flow will not run.
+
 ---
 
 ## 🔄 Data Flow with --start-proxy

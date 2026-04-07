@@ -20,6 +20,12 @@ import platform
 from typing import Dict, Any, List, Optional
 import argparse
 import logging
+import hashlib
+import secrets
+import base64
+import webbrowser
+from urllib.parse import urlencode, urlparse, parse_qs
+from http.server import HTTPServer, BaseHTTPRequestHandler
 from analytics import get_analytics
 
 # Appsecco Version Information
@@ -137,6 +143,11 @@ class MCPClient:
         self.debug = debug
         self.connection_mode = self._detect_connection_mode()
 
+        # Authentication: static headers from config + OAuth token state
+        self.auth_headers = dict(server_config.get("headers", {}))
+        self.oauth_access_token = None
+        self.oauth_refresh_token = None
+
     def _detect_connection_mode(self) -> str:
         """
         Detect the connection mode based on server configuration.
@@ -152,6 +163,21 @@ class MCPClient:
             return "mcp-remote"
         return "stdio"
     
+    def _build_request_headers(self) -> Dict[str, str]:
+        """Build HTTP headers for remote requests.
+
+        Merges Content-Type, static headers from config, and OAuth Bearer token.
+        Static headers take precedence; an OAuth token is added only when no
+        Authorization header is already present.
+        """
+        headers = {"Content-Type": "application/json"}
+        # Static headers from config (e.g. API keys, custom auth)
+        headers.update(self.auth_headers)
+        # OAuth token (only if no explicit Authorization header was configured)
+        if self.oauth_access_token and "Authorization" not in headers:
+            headers["Authorization"] = f"Bearer {self.oauth_access_token}"
+        return headers
+
     def _debug_print(self, *args, **kwargs):
         """Print debug message if debug mode is enabled"""
         if self.debug:
@@ -645,6 +671,7 @@ class MCPClient:
         """
         Send a JSON-RPC request directly to a remote MCP server via HTTP.
         Used when connection_mode is 'direct-remote' (no subprocess).
+        Handles 401 responses by attempting MCP OAuth 2.1 flow.
 
         Args:
             request: The JSON-RPC request dict
@@ -655,22 +682,24 @@ class MCPClient:
         """
         timeout = 5 if method == "notifications/initialized" else 30
 
-        try:
-            if self.use_burp_proxy:
-                proxies = {
-                    "http": self.proxy_url,
-                    "https": self.proxy_url
-                }
-                self._debug_print(f"🔍 [DEBUG] Direct remote request via Burp proxy: {proxies}")
-            else:
-                proxies = None
-                self._debug_print(f"🔍 [DEBUG] Direct remote request (no proxy)")
+        if self.use_burp_proxy:
+            proxies = {
+                "http": self.proxy_url,
+                "https": self.proxy_url
+            }
+            self._debug_print(f"🔍 [DEBUG] Direct remote request via Burp proxy: {proxies}")
+        else:
+            proxies = None
+            self._debug_print(f"🔍 [DEBUG] Direct remote request (no proxy)")
 
+        headers = self._build_request_headers()
+
+        try:
             response = requests.post(
                 self.base_url,
                 json=request,
                 proxies=proxies,
-                headers={"Content-Type": "application/json"},
+                headers=headers,
                 timeout=timeout,
                 verify=not self.bypass_ssl
             )
@@ -678,6 +707,29 @@ class MCPClient:
             self._debug_print(f"\n🔍 [DEBUG] Remote HTTP Response:")
             self._debug_print(f"   Status Code: {response.status_code}")
             self._debug_print(f"   Response Text (first 500 chars): {response.text[:500]}")
+
+            # Handle 401 — attempt OAuth flow, then retry once
+            if response.status_code == 401:
+                www_auth = response.headers.get("WWW-Authenticate", "")
+                self._debug_print(f"🔐 [DEBUG] Received 401. WWW-Authenticate: {www_auth}")
+
+                if self._perform_oauth_flow(www_auth, proxies):
+                    # Retry with the fresh token
+                    headers = self._build_request_headers()
+                    response = requests.post(
+                        self.base_url,
+                        json=request,
+                        proxies=proxies,
+                        headers=headers,
+                        timeout=timeout,
+                        verify=not self.bypass_ssl
+                    )
+                    self._debug_print(f"🔍 [DEBUG] Retry after OAuth — status {response.status_code}")
+                else:
+                    raise RuntimeError(
+                        f"Remote MCP returned 401 and OAuth flow failed or was not available. "
+                        f"Provide an Authorization header in the config or ensure the server supports MCP OAuth."
+                    )
 
             # Check for HTML response (Burp interception)
             content_type = response.headers.get('Content-Type', '').lower()
@@ -699,6 +751,272 @@ class MCPClient:
         except requests.exceptions.RequestException as e:
             print(f"❌ Direct remote request failed: {e}")
             raise RuntimeError(f"Failed to reach remote MCP at {self.base_url}: {e}")
+
+    # ------------------------------------------------------------------
+    # MCP OAuth 2.1 implementation (RFC 9728 discovery + PKCE flow)
+    # ------------------------------------------------------------------
+
+    def _perform_oauth_flow(self, www_authenticate: str, proxies: Optional[Dict] = None) -> bool:
+        """
+        Run the MCP OAuth 2.1 flow triggered by a 401 response.
+
+        1. Extract resource_metadata URL from WWW-Authenticate header
+        2. Fetch Protected Resource Metadata (RFC 9728)
+        3. Fetch Authorization Server Metadata
+        4. Run Authorization Code + PKCE flow via browser
+        5. Store the resulting access token
+
+        Returns True if a token was obtained, False otherwise.
+        """
+        print("🔐 Remote MCP server requires authentication — starting OAuth flow...")
+
+        # --- Step 1: Parse WWW-Authenticate for resource_metadata URL ---
+        resource_metadata_url = self._parse_www_authenticate(www_authenticate)
+        if not resource_metadata_url:
+            # Fallback: try well-known path on the MCP server itself
+            parsed = urlparse(self.base_url)
+            path = parsed.path.rstrip("/")
+            resource_metadata_url = f"{parsed.scheme}://{parsed.netloc}/.well-known/oauth-protected-resource{path}"
+            self._debug_print(f"🔍 [DEBUG] No resource_metadata in header, trying well-known: {resource_metadata_url}")
+
+        req_kwargs = {"timeout": 10, "verify": not self.bypass_ssl}
+        if proxies:
+            req_kwargs["proxies"] = proxies
+
+        # --- Step 2: Fetch Protected Resource Metadata ---
+        try:
+            self._debug_print(f"🔍 [DEBUG] Fetching resource metadata from: {resource_metadata_url}")
+            res = requests.get(resource_metadata_url, **req_kwargs)
+            if res.status_code != 200:
+                print(f"⚠️  Could not fetch resource metadata (HTTP {res.status_code})")
+                return False
+            resource_meta = res.json()
+            self._debug_print(f"🔍 [DEBUG] Resource metadata: {json.dumps(resource_meta, indent=2)}")
+        except Exception as e:
+            print(f"⚠️  Failed to fetch resource metadata: {e}")
+            return False
+
+        auth_servers = resource_meta.get("authorization_servers", [])
+        if not auth_servers:
+            print("⚠️  No authorization_servers listed in resource metadata")
+            return False
+
+        auth_server_base = auth_servers[0].rstrip("/")
+
+        # --- Step 3: Fetch Authorization Server Metadata ---
+        as_meta_url = f"{auth_server_base}/.well-known/oauth-authorization-server"
+        try:
+            self._debug_print(f"🔍 [DEBUG] Fetching auth server metadata from: {as_meta_url}")
+            res = requests.get(as_meta_url, **req_kwargs)
+            if res.status_code != 200:
+                # Try OpenID Connect fallback
+                as_meta_url = f"{auth_server_base}/.well-known/openid-configuration"
+                self._debug_print(f"🔍 [DEBUG] Falling back to OIDC: {as_meta_url}")
+                res = requests.get(as_meta_url, **req_kwargs)
+            if res.status_code != 200:
+                print(f"⚠️  Could not fetch auth server metadata (HTTP {res.status_code})")
+                return False
+            as_meta = res.json()
+            self._debug_print(f"🔍 [DEBUG] Auth server metadata: {json.dumps(as_meta, indent=2)}")
+        except Exception as e:
+            print(f"⚠️  Failed to fetch auth server metadata: {e}")
+            return False
+
+        authorization_endpoint = as_meta.get("authorization_endpoint")
+        token_endpoint = as_meta.get("token_endpoint")
+        registration_endpoint = as_meta.get("registration_endpoint")
+
+        if not authorization_endpoint or not token_endpoint:
+            print("⚠️  Auth server metadata missing authorization_endpoint or token_endpoint")
+            return False
+
+        # --- Step 4: Dynamic Client Registration (if supported) ---
+        client_id = self.server_config.get("oauth_client_id", "")
+        client_secret = self.server_config.get("oauth_client_secret", "")
+        redirect_port = 10836  # local callback port
+        redirect_uri = f"http://127.0.0.1:{redirect_port}/callback"
+
+        if not client_id and registration_endpoint:
+            client_id = self._oauth_dynamic_registration(
+                registration_endpoint, redirect_uri, req_kwargs
+            )
+
+        if not client_id:
+            print("⚠️  No OAuth client_id available. Set 'oauth_client_id' in the server config")
+            print("   or ensure the auth server supports dynamic client registration.")
+            return False
+
+        # --- Step 5: Authorization Code + PKCE flow ---
+        resource_uri = resource_meta.get("resource", self.base_url)
+        scopes = resource_meta.get("scopes_supported", [])
+        scope_str = " ".join(scopes) if scopes else ""
+
+        return self._oauth_authorization_code_flow(
+            authorization_endpoint, token_endpoint,
+            client_id, client_secret, redirect_uri, redirect_port,
+            resource_uri, scope_str, req_kwargs
+        )
+
+    def _parse_www_authenticate(self, header: str) -> Optional[str]:
+        """Extract resource_metadata URL from WWW-Authenticate: Bearer ... header."""
+        if not header:
+            return None
+        for part in header.split(","):
+            part = part.strip()
+            if "resource_metadata=" in part:
+                val = part.split("resource_metadata=", 1)[1].strip().strip('"')
+                return val
+        return None
+
+    def _oauth_dynamic_registration(self, registration_endpoint: str,
+                                     redirect_uri: str,
+                                     req_kwargs: Dict) -> Optional[str]:
+        """Attempt RFC 7591 Dynamic Client Registration. Returns client_id or None."""
+        reg_body = {
+            "client_name": "Appsecco MCP Client",
+            "redirect_uris": [redirect_uri],
+            "grant_types": ["authorization_code"],
+            "response_types": ["code"],
+            "token_endpoint_auth_method": "none"
+        }
+        try:
+            self._debug_print(f"🔍 [DEBUG] Attempting dynamic client registration at: {registration_endpoint}")
+            res = requests.post(registration_endpoint, json=reg_body,
+                                headers={"Content-Type": "application/json"}, **req_kwargs)
+            if res.status_code in (200, 201):
+                data = res.json()
+                cid = data.get("client_id")
+                self._debug_print(f"🔍 [DEBUG] Registered client_id: {cid}")
+                print(f"✅ Dynamically registered OAuth client: {cid}")
+                return cid
+            else:
+                self._debug_print(f"⚠️  [DEBUG] Registration returned {res.status_code}: {res.text[:300]}")
+        except Exception as e:
+            self._debug_print(f"⚠️  [DEBUG] Dynamic registration failed: {e}")
+        return None
+
+    def _oauth_authorization_code_flow(self, auth_endpoint: str, token_endpoint: str,
+                                        client_id: str, client_secret: str,
+                                        redirect_uri: str, redirect_port: int,
+                                        resource_uri: str, scope: str,
+                                        req_kwargs: Dict) -> bool:
+        """
+        Run the full OAuth 2.1 Authorization Code + PKCE flow.
+        Opens the user's browser, waits for the callback, exchanges the code for a token.
+        Returns True if access_token was obtained.
+        """
+        # Generate PKCE challenge
+        code_verifier = secrets.token_urlsafe(64)
+        code_challenge = base64.urlsafe_b64encode(
+            hashlib.sha256(code_verifier.encode()).digest()
+        ).rstrip(b"=").decode()
+        state = secrets.token_urlsafe(32)
+
+        auth_params = {
+            "response_type": "code",
+            "client_id": client_id,
+            "redirect_uri": redirect_uri,
+            "code_challenge": code_challenge,
+            "code_challenge_method": "S256",
+            "state": state,
+        }
+        if resource_uri:
+            auth_params["resource"] = resource_uri
+        if scope:
+            auth_params["scope"] = scope
+
+        auth_url = f"{auth_endpoint}?{urlencode(auth_params)}"
+
+        # --- Start a local HTTP server to catch the callback ---
+        auth_code_result = {"code": None, "error": None}
+
+        class OAuthCallbackHandler(BaseHTTPRequestHandler):
+            def do_GET(self):
+                qs = parse_qs(urlparse(self.path).query)
+                returned_state = qs.get("state", [None])[0]
+                if returned_state != state:
+                    auth_code_result["error"] = "State mismatch"
+                elif "error" in qs:
+                    auth_code_result["error"] = qs["error"][0]
+                else:
+                    auth_code_result["code"] = qs.get("code", [None])[0]
+
+                self.send_response(200)
+                self.send_header("Content-Type", "text/html")
+                self.end_headers()
+                if auth_code_result["code"]:
+                    self.wfile.write(b"<html><body><h2>Authorization successful!</h2>"
+                                     b"<p>You can close this tab and return to the terminal.</p></body></html>")
+                else:
+                    msg = auth_code_result["error"] or "Unknown error"
+                    self.wfile.write(f"<html><body><h2>Authorization failed</h2><p>{msg}</p></body></html>".encode())
+
+            def log_message(self, format, *args):
+                pass  # Suppress HTTP server logs
+
+        try:
+            callback_server = HTTPServer(("127.0.0.1", redirect_port), OAuthCallbackHandler)
+        except OSError as e:
+            print(f"❌ Could not start OAuth callback server on port {redirect_port}: {e}")
+            return False
+
+        # Handle one request in a background thread
+        callback_thread = threading.Thread(target=callback_server.handle_request, daemon=True)
+        callback_thread.start()
+
+        print(f"🌐 Opening browser for OAuth authorization...")
+        print(f"   If the browser does not open, visit:\n   {auth_url}")
+        webbrowser.open(auth_url)
+
+        # Wait for the callback (up to 120 seconds)
+        callback_thread.join(timeout=120)
+        callback_server.server_close()
+
+        if auth_code_result["error"]:
+            print(f"❌ OAuth authorization failed: {auth_code_result['error']}")
+            return False
+        if not auth_code_result["code"]:
+            print("❌ OAuth authorization timed out (120s)")
+            return False
+
+        # --- Exchange code for token ---
+        token_data = {
+            "grant_type": "authorization_code",
+            "code": auth_code_result["code"],
+            "redirect_uri": redirect_uri,
+            "client_id": client_id,
+            "code_verifier": code_verifier,
+        }
+        if resource_uri:
+            token_data["resource"] = resource_uri
+        if client_secret:
+            token_data["client_secret"] = client_secret
+
+        try:
+            self._debug_print(f"🔍 [DEBUG] Exchanging auth code at: {token_endpoint}")
+            res = requests.post(token_endpoint, data=token_data,
+                                headers={"Content-Type": "application/x-www-form-urlencoded"},
+                                **req_kwargs)
+            if res.status_code != 200:
+                print(f"❌ Token exchange failed (HTTP {res.status_code}): {res.text[:300]}")
+                return False
+
+            token_resp = res.json()
+            self.oauth_access_token = token_resp.get("access_token")
+            self.oauth_refresh_token = token_resp.get("refresh_token")
+            expires_in = token_resp.get("expires_in", "unknown")
+
+            if self.oauth_access_token:
+                print(f"✅ OAuth token obtained (expires in {expires_in}s)")
+                self._debug_print(f"🔍 [DEBUG] Access token (first 20 chars): {self.oauth_access_token[:20]}...")
+                return True
+            else:
+                print(f"❌ Token response did not contain access_token: {res.text[:300]}")
+                return False
+
+        except Exception as e:
+            print(f"❌ Token exchange failed: {e}")
+            return False
 
     def _send_stdio_request(self, method: str, params: Dict[str, Any] = None) -> Dict[str, Any]:
         """
