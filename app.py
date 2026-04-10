@@ -37,13 +37,13 @@ APPSECCO_COPYRIGHT = "© 2025 Appsecco. All rights reserved."
 
 # Appsecco ASCII Art Banner
 APPSECCO_ASCII_ART = """
-   ###    ########  ########   ######  ########  ######   ######   ####### 
+   ###    ########  ########   ######  ########  ######   ######   #######
   ## ##   ##     ## ##     ## ##    ## ##       ##    ## ##    ## ##     ##
  ##   ##  ##     ## ##     ## ##       ##       ##       ##       ##     ##
 ##     ## ########  ########   ######  ######   ##       ##       ##     ##
 ######### ##        ##              ## ##       ##       ##       ##     ##
 ##     ## ##        ##        ##    ## ##       ##    ## ##    ## ##     ##
-##     ## ##        ##         ######  ########  ######   ######   ####### 
+##     ## ##        ##         ######  ########  ######   ######   #######
 """
 
 APPSECCO_BANNER = """
@@ -51,7 +51,7 @@ APPSECCO_BANNER = """
 ║                                                                              ║
 ║     ###    ########  ########   ######  ########  ######   ######   #######  ║
 ║    ## ##   ##     ## ##     ## ##    ## ##       ##    ## ##    ## ##     ## ║
-║   ##   ##  ##     ## ##     ## ##       ##       ##       ##       ##     ## ║    
+║   ##   ##  ##     ## ##     ## ##       ##       ##       ##       ##     ## ║
 ║  ##     ## ########  ########   ######  ######   ##       ##       ##     ## ║
 ║  ######### ##        ##              ## ##       ##       ##       ##     ## ║
 ║  ##     ## ##        ##        ##    ## ##       ##    ## ##    ## ##     ## ║
@@ -80,17 +80,17 @@ APPSECCO_TAGLINE = """
 
 class MCPConfig:
     """Appsecco MCP Client and Proxy - Send MCP Server Traffic to your Burp Suite"""
-    
+
     def __init__(self, config_file: str = "mcp_config.json"):
         """
         Initialize Appsecco MCP Client and Proxy configuration from JSON file
-        
+
         Args:
             config_file: Path to the MCP configuration file
         """
         self.config_file = config_file
         self.config = self._load_config()
-    
+
     def _load_config(self) -> Dict[str, Any]:
         """Load configuration from JSON file"""
         try:
@@ -102,12 +102,12 @@ class MCPConfig:
         except json.JSONDecodeError as e:
             print(f"❌ Invalid JSON in configuration file: {e}")
             sys.exit(1)
-    
+
     def get_server_config(self, server_name: str) -> Optional[Dict[str, Any]]:
         """Get configuration for a specific server"""
         servers = self.config.get("mcpServers", {})
         return servers.get(server_name)
-    
+
     def list_servers(self) -> List[str]:
         """List all available server names"""
         servers = self.config.get("mcpServers", {})
@@ -116,7 +116,7 @@ class MCPConfig:
 
 class MCPClient:
     """Appsecco MCP Client and Proxy - Generic MCP Client for communicating with any MCP Server via HTTP proxy"""
-    
+
     def __init__(self, server_config: Dict[str, Any], proxy_url: str = "http://127.0.0.1:8080", use_proxychains: bool = True, bypass_ssl: bool = True, debug: bool = False):
         """
         Initialize the Appsecco MCP Client and Proxy
@@ -164,7 +164,7 @@ class MCPClient:
         if "mcp-remote" in self.args:
             return "mcp-remote"
         return "stdio"
-    
+
     def _build_request_headers(self) -> Dict[str, str]:
         """Build HTTP headers for remote requests.
 
@@ -191,22 +191,22 @@ class MCPClient:
         """Print debug message if debug mode is enabled"""
         if self.debug:
             print(*args, **kwargs)
-        
+
     def _check_proxychains_installed(self) -> bool:
         """Check if proxychains is installed on the system"""
         try:
             # Determine the correct proxychains command based on OS
             proxychains_cmd = 'proxychains4' if platform.system() == 'Darwin' else 'proxychains'
-            result = subprocess.run(['which', proxychains_cmd], 
+            result = subprocess.run(['which', proxychains_cmd],
                                   capture_output=True, text=True, check=False)
             return result.returncode == 0
         except Exception:
             return False
-    
+
     def _check_proxychains_config(self) -> bool:
         """Check if proxychains.conf exists in the current directory"""
         return os.path.exists('proxychains.conf')
-    
+
     def _verify_proxychains_config(self) -> bool:
         """Verify that proxychains.conf is configured for Burp port 8080"""
         try:
@@ -223,7 +223,7 @@ class MCPClient:
         except Exception as e:
             print(f"❌ Error reading proxychains.conf: {e}")
             return False
-    
+
     def start_server(self) -> bool:
         """Start the MCP server process (or connect directly for remote MCPs)"""
 
@@ -248,32 +248,32 @@ class MCPClient:
                         print("   On Ubuntu/Debian: sudo apt-get install proxychains")
                         print("   On CentOS/RHEL: sudo yum install proxychains")
                     return False
-                
+
                 if not self._check_proxychains_config():
                     print("❌ proxychains.conf not found in current directory")
                     print("   Please create a proxychains.conf file or disable proxychains usage")
                     return False
-                
+
                 # Verify proxychains configuration
                 self._verify_proxychains_config()
-                
+
 
                 # Determine the correct proxychains command based on OS
                 proxychains_cmd = 'proxychains4' if platform.system() == 'Darwin' else 'proxychains'
                 cmd = [proxychains_cmd, self.command] + self.args
             else:
                 cmd = [self.command] + self.args
-            
+
             # Set environment variables to bypass SSL certificate verification
             # This is needed when using proxychains with Burp for HTTPS requests
             env = os.environ.copy()
-            
+
             # Add environment variables from server configuration if present
             config_env = self.server_config.get("env", {})
             if config_env:
                 print(f"🔧 Loading environment variables from config: {list(config_env.keys())}")
                 env.update(config_env)
-            
+
             if self.bypass_ssl:
                 # SSL bypass variables (only set if not already defined in config)
                 ssl_bypass_vars = {
@@ -299,7 +299,7 @@ class MCPClient:
                 env['http_proxy'] = self.proxy_url
                 env['HTTPS_PROXY'] = self.proxy_url
                 env['https_proxy'] = self.proxy_url
-                       
+
             self.process = subprocess.Popen(
                 cmd,
                 stdin=subprocess.PIPE,
@@ -323,46 +323,46 @@ class MCPClient:
                     "server_command": cmd,
                 })
                 return False
-            
+
 
             get_analytics().track_server_connected("target_mcp_server_started", {
                 "server_command": cmd,
             })
             return True
-                
+
         except Exception as e:
             print(f"❌ Error starting MCP server: {e}")
             get_analytics().track_error("target_mcp_server_failed_to_start", {
                 "server_command": cmd,
             })
             return False
-    
+
     def _check_output_for_indicators(self, output: str, stream_name: str = "output") -> Optional[bool]:
         """
         Check output for success or error indicators
-        
+
         Args:
             output: The output string to check
             stream_name: Name of the stream (e.g., "stderr", "stdout") for logging
-            
+
         Returns:
             True if success indicator found, False if error indicator found, None if neither
         """
         output_lower = output.lower()
-        
+
         success_indicators = [
-                'info','ready', 'started', 'listening', 'server running', 'server is running', 
-                'server is ready', 'server started', 'mcp server', 'initialized', 
-                'connected', 'package installed', 'npm', 'node_modules', 'successfully', 
+                'info','ready', 'started', 'listening', 'server running', 'server is running',
+                'server is ready', 'server started', 'mcp server', 'initialized',
+                'connected', 'package installed', 'npm', 'node_modules', 'successfully',
                 'running on', 'ready to accept connections', 'mcp server is running',
                 'mcp server is ready', 'initialized', 'connected', 'installed'
             ]
         if any(indicator in output_lower for indicator in success_indicators):
             print(f"✅ Server appears to be ready (from {stream_name})")
             return True
-        
+
         error_indicators = [
-            'error', 'failed', 'exception', 'crash', 'exit', 'not found', 
+            'error', 'failed', 'exception', 'crash', 'exit', 'not found',
             'command failed', 'npm error', 'error', 'failed', 'exception', 'crash', 'exit', 'not found', 'command failed', 'npm error'
         ]
         if any(error in output_lower for error in error_indicators):
@@ -373,22 +373,22 @@ class MCPClient:
     def _wait_for_server_start(self, timeout: int = 20) -> bool:
         """
         Wait for the MCP server to start and detect readiness
-        
+
         Args:
             timeout: Maximum time to wait in seconds
-            
+
         Returns:
             True if server started successfully, False otherwise
         """
 
-        
+
         start_time = time.time()
         last_output = ""
         output_buffer = []
-        
+
         # Set stdout to non-blocking mode
         import select
-        
+
         while time.time() - start_time < timeout:
             # Check if process is still running
             if self.process.poll() is not None:
@@ -400,23 +400,23 @@ class MCPClient:
                 if stderr:
                     print(f"STDERR: {stderr}")
                 return False
-            
+
             # Try to read any available output without blocking
             try:
                 import select
-                
+
                 # Check stderr
                 if self.process.stderr and select.select([self.process.stderr], [], [], 0.1)[0]:
                     stderr = self.process.stderr.readline()
                     if stderr:
                         stderr = stderr.strip()
                         output_buffer.append(stderr)
-                        
+
                         # Check for indicators in stderr
                         result = self._check_output_for_indicators(stderr, "stderr")
                         if result is not None:
                             return result
-                
+
                 # Check stdout
                 if self.process.stdout and select.select([self.process.stdout], [], [], 0.1)[0]:
                     stdout = self.process.stdout.readline()
@@ -424,7 +424,7 @@ class MCPClient:
                         stdout = stdout.strip()
                         output_buffer.append(stdout)
                         last_output = stdout
-                        
+
                         # Check for indicators in stdout
                         result = self._check_output_for_indicators(stdout, "stdout")
                         if result is not None:
@@ -435,15 +435,15 @@ class MCPClient:
 
             # Small delay to avoid busy waiting
             time.sleep(0.5)
-            
+
             # Show progress every 10 seconds
             elapsed = int(time.time() - start_time)
             if elapsed % 10 == 0 and elapsed > 0:
                 print(f"⏳ Still waiting... ({elapsed}s elapsed)")
-        
+
         # Timeout reached
         print(f"⏰ Timeout reached after {timeout} seconds")
-        
+
         # Check if process is still running (it might be ready but not outputting)
         if self.process.poll() is None:
             print("⚠️  Process is still running but no ready indicator detected")
@@ -452,7 +452,7 @@ class MCPClient:
         else:
             print("❌ Process has exited during startup")
             return False
-    
+
     def stop_server(self):
         """Stop the MCP server process (no-op for direct remote MCPs)"""
 
@@ -469,11 +469,11 @@ class MCPClient:
             except subprocess.TimeoutExpired:
                 self.process.kill()
             self.process = None
-    
+
     def _check_proxy_server_connectivity(self) -> bool:
         """
         Check if the local proxy server on port 3000 is accessible
-        
+
         Returns:
             True if accessible, False otherwise
         """
@@ -484,7 +484,7 @@ class MCPClient:
             test_socket.settimeout(2)
             result = test_socket.connect_ex(('localhost', 3000))
             test_socket.close()
-            
+
             if result == 0:
                 self._debug_print(f"🔍 [DEBUG] Proxy server on port 3000 is accessible (direct connection)")
                 return True
@@ -494,15 +494,15 @@ class MCPClient:
         except Exception as e:
             self._debug_print(f"⚠️  [DEBUG] Error checking proxy server connectivity: {e}")
             return False
-    
+
     def send_request(self, method: str, params: Dict[str, Any] = None) -> Dict[str, Any]:
         """
         Send a JSON-RPC request to the MCP server via HTTP proxy
-        
+
         Args:
             method: The RPC method to call
             params: Parameters for the method
-            
+
         Returns:
             Response from the server
         """
@@ -512,7 +512,7 @@ class MCPClient:
                 "jsonrpc": "2.0",
                 "method": method
             }
-        else:   
+        else:
             request = {
                 "jsonrpc": "2.0",
                 "id": self.request_id,
@@ -523,7 +523,7 @@ class MCPClient:
 
         if params:
             request["params"] = params
-        
+
         # Debug: Log request details
         target_url = self.base_url if self.connection_mode == "direct-remote" else f"{self.base_url}/mcp"
         self._debug_print(f"\n🔍 [DEBUG] Sending HTTP request:")
@@ -547,7 +547,7 @@ class MCPClient:
             self._debug_print(f"   The proxy server on port 3000 may not be running")
             self._debug_print(f"   Falling back to stdio communication")
             return self._send_stdio_request(method, params)
-        
+
         try:
             if method == "notifications/initialized":
                 timeout = 5
@@ -589,7 +589,7 @@ class MCPClient:
                     headers={"Content-Type": "application/json"},
                     timeout=timeout
                 )
-            
+
             # Debug: Log response details
             self._debug_print(f"\n🔍 [DEBUG] HTTP Response received:")
             self._debug_print(f"   Status Code: {response.status_code}")
@@ -597,7 +597,7 @@ class MCPClient:
             self._debug_print(f"   Response Content-Length: {len(response.content)} bytes")
             self._debug_print(f"   Response Text (first 500 chars): {response.text[:500]}")
             self._debug_print(f"   Response Raw (first 500 bytes): {response.content[:500]}")
-            
+
             # Check if Burp is returning HTML instead of forwarding to the proxy server
             content_type = response.headers.get('Content-Type', '').lower()
             if 'text/html' in content_type or response.text.strip().startswith('<html'):
@@ -617,12 +617,12 @@ class MCPClient:
                     self._debug_print(f"   💡 Check if the proxy server on port 3000 is running and responding")
                 self._debug_print(f"   Response preview: {response.text[:200]}")
                 raise RuntimeError(f"Received HTML response instead of JSON. Burp may be intercepting the request to {self.base_url}/mcp")
-            
+
             if response.status_code != 200:
                 self._debug_print(f"❌ [DEBUG] Non-200 status code: {response.status_code}")
                 self._debug_print(f"   Response body: {response.text}")
                 raise RuntimeError(f"HTTP request failed with status {response.status_code}")
-            
+
             # Check if response body is empty before parsing
             if not response.text or not response.text.strip():
                 self._debug_print(f"❌ [DEBUG] Response body is empty!")
@@ -630,7 +630,7 @@ class MCPClient:
                 self._debug_print(f"   Response headers: {dict(response.headers)}")
                 self._debug_print(f"   ⚠️  The proxy server on port 3000 may not be running or responding")
                 # Attempting to parse empty response will trigger JSONDecodeError below
-            
+
             # Try to parse JSON
             try:
                 parsed_response = response.json()
@@ -647,7 +647,7 @@ class MCPClient:
                     self._debug_print(f"   ⚠️  Response appears to be HTML, not JSON")
                     self._debug_print(f"   This suggests the proxy server is not running or Burp is intercepting")
                 raise
-            
+
         except requests.exceptions.RequestException as e:
             # Fallback to direct stdio if HTTP fails
             self._debug_print(f"\n⚠️  [DEBUG] HTTP request failed, falling back to stdio:")
@@ -675,7 +675,7 @@ class MCPClient:
             self._debug_print(f"   Traceback:\n{traceback.format_exc()}")
             print(f"❌ Unexpected error in send_request: {e}")
             return self._send_stdio_request(method, params)
-    
+
     def _get_httpx_client(self) -> httpx.Client:
         """Create an httpx client with HTTP/2 support and proxy/SSL settings."""
         proxy_url = self.proxy_url if self.use_burp_proxy else None
@@ -766,7 +766,7 @@ class MCPClient:
                     else:
                         raise RuntimeError(
                             f"Remote MCP returned 401 and OAuth flow failed or was not available. "
-                            f"Provide an Authorization header in the config or ensure the server supports MCP OAuth."
+                            f"Provide or verify the Authorization header in the config or ensure the server supports MCP OAuth."
                         )
 
                 # Capture MCP session ID from response headers
@@ -1063,43 +1063,43 @@ class MCPClient:
     def _send_stdio_request(self, method: str, params: Dict[str, Any] = None) -> Dict[str, Any]:
         """
         Fallback method: Send request directly via stdio
-        
+
         Args:
             method: The RPC method to call
             params: Parameters for the method
-            
+
         Returns:
             Response from the server
         """
         if not self.process:
             raise RuntimeError("MCP server not started")
-        
+
         request = {
             "jsonrpc": "2.0",
             "id": self.request_id,
             "method": method
         }
-        
+
         if params:
             request["params"] = params
-        
+
         self.request_id += 1
-        
+
         # Send request
         request_str = json.dumps(request) + "\n"
         self.process.stdin.write(request_str)
         self.process.stdin.flush()
-        
+
         # Read response
         response_line = self.process.stdout.readline()
         if not response_line:
             raise RuntimeError("No response from server")
-        
+
         try:
             return json.loads(response_line)
         except json.JSONDecodeError as e:
             raise RuntimeError(f"Invalid JSON response: {e}")
-    
+
     def initialize(self) -> bool:
         """Initialize the MCP connection"""
         try:
@@ -1111,27 +1111,27 @@ class MCPClient:
                 },
                 "capabilities": {}
             }
-            
+
             response = self.send_request("initialize", init_params)
-            
-            
+
+
             if "result" in response:
                 self.initialized = True
                 print(f"✅ MCP Initialize done")
-        
+
                 return True
             else:
                 print(f"❌ Initialization failed: {response}")
                 return False
-                
+
         except Exception as e:
             print(f"❌ Error during initialization: {e}")
             return False
-        
+
     def initialized_notification(self) -> bool:
         """Send initialized notification to the MCP server"""
         try:
-            
+
             response = self.send_request("notifications/initialized", {})
             print(f"✅ Initialized notification sent to the MCP server. No response is expected.")
             print(f"✅ Fetching available tools next...")
@@ -1139,12 +1139,12 @@ class MCPClient:
         except Exception as e:
             print(f"❌ Error sending initialized notification: {e}")
             return False
-    
+
     def list_tools(self) -> List[Dict[str, Any]]:
         """List available tools from the MCP server"""
         try:
             response = self.send_request("tools/list", {})
-            
+
             if "result" in response and "tools" in response["result"]:
                 tools = response["result"]["tools"]
                 self.tools = {tool["name"]: tool for tool in tools}
@@ -1157,20 +1157,20 @@ class MCPClient:
                 })
                 return []
 
-            
-                
+
+
         except Exception as e:
             print(f"❌ Error listing tools: {e}")
             return []
-    
+
     def call_tool(self, tool_name: str, arguments: Dict[str, Any]) -> Dict[str, Any]:
         """
         Call a specific tool on the MCP server
-        
+
         Args:
             tool_name: Name of the tool to call
             arguments: Arguments for the tool
-            
+
         Returns:
             Tool response
         """
@@ -1179,15 +1179,15 @@ class MCPClient:
                 "name": tool_name,
                 "arguments": arguments
             }
-            
+
             response = self.send_request("tools/call", params)
-            
+
             if "result" in response:
                 return response["result"]
             else:
                 print(f"❌ Tool call failed: {response}")
                 return {}
-                
+
         except Exception as e:
             print(f"❌ Error calling tool: {e}")
             return {}
@@ -1195,11 +1195,11 @@ class MCPClient:
 
 class GenericMCPApp:
     """Appsecco MCP Client PST - Professional Security Testing Application with interactive interface"""
-    
+
     def __init__(self, config_file: str = "mcp_config.json", proxy_url: str = "http://127.0.0.1:8080", use_burp_proxy: bool = True, use_proxychains: bool = True, bypass_ssl: bool = True, debug: bool = False):
         """
         Initialize the Appsecco MCP Client PST application
-        
+
         Args:
             config_file: Path to the MCP configuration file
             proxy_url: HTTP proxy URL for Burp inspection
@@ -1226,28 +1226,28 @@ class GenericMCPApp:
             "bypass_ssl": bypass_ssl,
             "proxy_url": proxy_url
         })
-    
+
     def select_server(self) -> bool:
         """Let user select an MCP server"""
         servers = self.config.list_servers()
-        
+
         if not servers:
             print("❌ No MCP servers configured")
             return False
-        
+
         print("\n📋 Available MCP servers:")
         for i, server_name in enumerate(servers, 1):
             print(f"   {i}. {server_name}")
-        
+
         while True:
             try:
                 choice = input(f"\nSelect server (1-{len(servers)}): ").strip()
                 server_index = int(choice) - 1
-                
+
                 if 0 <= server_index < len(servers):
                     server_name = servers[server_index]
                     server_config = self.config.get_server_config(server_name)
-                    
+
                     if server_config:
                         self.current_server = server_name
                         self.client = MCPClient(server_config, self.proxy_url, self.use_proxychains, self.bypass_ssl, self.debug)
@@ -1265,13 +1265,13 @@ class GenericMCPApp:
             except KeyboardInterrupt:
                 print("\n👋 Goodbye!")
                 return False
-    
+
     def start_server(self, start_proxy: bool = False, proxy_port: int = 3000) -> bool:
         """Start the selected MCP server"""
         if not self.client:
             print("❌ No server selected")
             return False
-        
+
         print(f"🚀 Appsecco MCP Client PST - Starting server: {self.current_server}")
         print(f"   Connection mode: {self.client.connection_mode}")
         if not self.client.start_server():
@@ -1288,31 +1288,31 @@ class GenericMCPApp:
             time.sleep(1)
         else:
             print(f"⚠️  Proxy server not enabled")
-        
+
         if not self.client.initialize():
             self.client.stop_server()
             return False
-        
+
         self.client.initialized_notification()
 
         return True
-    
-    
+
+
     def _start_proxy_server(self, port: int = 3000):
         """Start the HTTP proxy server in a separate thread"""
         from http.server import HTTPServer, BaseHTTPRequestHandler
         import threading
         import socket
-        
+
         print(f"🔧 Starting HTTP proxy server on port {port}...")
-        
+
         # Check if port is already in use
         try:
             test_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             test_socket.settimeout(1)
             result = test_socket.connect_ex(('localhost', port))
             test_socket.close()
-            
+
             if result == 0:
                 print(f"⚠️  Port {port} is already in use!")
                 print(f"   This might prevent the proxy server from starting")
@@ -1322,11 +1322,11 @@ class GenericMCPApp:
                 print(f"✅ Port {port} is available")
         except Exception as e:
             print(f"⚠️  Could not check port availability: {e}")
-        
+
         # Store the MCP process reference and debug flag
         mcp_process = self.client.process
         debug_flag = self.debug
-        
+
         # Create a closure to capture mcp_process and debug_flag
         def create_handler_class(mcp_process_ref, debug):
             class MCPProxyHandler(BaseHTTPRequestHandler):
@@ -1342,14 +1342,14 @@ class GenericMCPApp:
                             self._debug_print(f"🔍 [PROXY DEBUG] Content-Length: {content_length}")
                             post_data = self.rfile.read(content_length)
                             self._debug_print(f"🔍 [PROXY DEBUG] Read {len(post_data)} bytes of POST data")
-                            
+
                             request = json.loads(post_data.decode('utf-8'))
                             self._debug_print(f"🔍 [PROXY DEBUG] Parsed request: {json.dumps(request, indent=2)}")
-                            
+
                             self._debug_print(f"🔍 [PROXY DEBUG] Forwarding request to MCP server via stdio...")
                             response = self.forward_to_mcp(request)
                             self._debug_print(f"🔍 [PROXY DEBUG] Received response from MCP: {json.dumps(response, indent=2)}")
-                            
+
                             self._debug_print(f"🔍 [PROXY DEBUG] Sending HTTP 200 response...")
                             self.send_response(200)
                             self.send_header('Content-type', 'application/json')
@@ -1357,13 +1357,13 @@ class GenericMCPApp:
                             self.send_header('Access-Control-Allow-Methods', 'POST, OPTIONS')
                             self.send_header('Access-Control-Allow-Headers', 'Content-Type')
                             self.end_headers()
-                            
+
                             response_json = json.dumps(response)
                             self._debug_print(f"🔍 [PROXY DEBUG] Writing response JSON ({len(response_json)} bytes)...")
                             self.wfile.write(response_json.encode('utf-8'))
                             self.wfile.flush()
                             self._debug_print(f"🔍 [PROXY DEBUG] Response sent successfully")
-                            
+
                         except Exception as e:
                             self._debug_print(f"❌ [PROXY DEBUG] Proxy error: {e}")
                             import traceback
@@ -1382,7 +1382,7 @@ class GenericMCPApp:
                         self.send_response(404)
                         self.end_headers()
                         self.wfile.write(json.dumps({"error": f"Path {self.path} not found"}).encode('utf-8'))
-                
+
                 def do_OPTIONS(self):
                     """Handle CORS preflight requests"""
                     self.send_response(200)
@@ -1390,28 +1390,28 @@ class GenericMCPApp:
                     self.send_header('Access-Control-Allow-Methods', 'POST, OPTIONS')
                     self.send_header('Access-Control-Allow-Headers', 'Content-Type')
                     self.end_headers()
-                
+
                 def forward_to_mcp(self, request):
                     """Forward request to MCP stdio server"""
                     self._debug_print(f"🔍 [PROXY DEBUG] forward_to_mcp called with method: {request.get('method', 'unknown')}")
-                    
+
                     if not mcp_process_ref:
                         self._debug_print(f"❌ [PROXY DEBUG] MCP server process reference is None")
                         return {"error": "MCP server not available"}
-                    
+
                     process_status = mcp_process_ref.poll()
                     self._debug_print(f"🔍 [PROXY DEBUG] MCP process poll() result: {process_status} (None = running)")
                     if process_status is not None:
                         self._debug_print(f"❌ [PROXY DEBUG] MCP server process has exited with code: {process_status}")
                         return {"error": "MCP server process has exited"}
-                    
+
                     try:
                         # Send request to MCP server via stdio
                         request_str = json.dumps(request) + "\n"
                         self._debug_print(f"🔍 [PROXY DEBUG] Sending request to MCP server via stdio:")
                         self._debug_print(f"   Request string: {repr(request_str)}")
                         self._debug_print(f"   Request length: {len(request_str)} bytes")
-                        
+
                         mcp_process_ref.stdin.write(request_str)
                         mcp_process_ref.stdin.flush()
                         self._debug_print(f"🔍 [PROXY DEBUG] Request written and flushed to MCP server stdin")
@@ -1423,24 +1423,24 @@ class GenericMCPApp:
                             # Read response
                             self._debug_print(f"🔍 [PROXY DEBUG] Waiting for response from MCP server stdout...")
                             self._debug_print(f"🔍 [PROXY DEBUG] stdout readable: {mcp_process_ref.stdout.readable()}")
-                            
+
                             # Note: readline() will block until a line is available or EOF
                             # This is expected behavior for MCP stdio communication
                             self._debug_print(f"🔍 [PROXY DEBUG] Calling readline() (this may block until response is available)...")
                             response_line = mcp_process_ref.stdout.readline()
                             self._debug_print(f"🔍 [PROXY DEBUG] Read line from stdout: {repr(response_line)}")
                             self._debug_print(f"🔍 [PROXY DEBUG] Response line length: {len(response_line) if response_line else 0}")
-                            
+
                             if not response_line:
                                 self._debug_print(f"❌ [PROXY DEBUG] No response line received from MCP server")
                                 return {"error": "No response from MCP server"}
-                            
+
                             self._debug_print(f"🔍 [PROXY DEBUG] Attempting to parse JSON from response line...")
                             response = json.loads(response_line.strip())
                             self._debug_print(f"🔍 [PROXY DEBUG] Successfully parsed JSON response")
-                        
+
                         return response
-                        
+
                     except json.JSONDecodeError as json_err:
                         self._debug_print(f"❌ [PROXY DEBUG] JSON decode error: {json_err}")
                         self._debug_print(f"   Response line was: {repr(response_line) if 'response_line' in locals() else 'N/A'}")
@@ -1452,22 +1452,22 @@ class GenericMCPApp:
                         import traceback
                         self._debug_print(traceback.format_exc())
                         return {"error": f"Communication error: {str(e)}"}
-                
+
                 def log_message(self, format, *args):
                     # Suppress HTTP server logs
                     pass
-            
+
             return MCPProxyHandler
-        
+
         MCPProxyHandler = create_handler_class(mcp_process, debug_flag)
-        
+
         try:
             if self.debug:
                 print(f"🔍 [PROXY DEBUG] Creating HTTPServer on localhost:{port}")
             self.proxy_server = HTTPServer(('localhost', port), MCPProxyHandler)
             if self.debug:
                 print(f"🔍 [PROXY DEBUG] HTTPServer created, starting in thread...")
-            
+
             # Start proxy server in a separate thread
             self.proxy_thread = threading.Thread(
                 target=self.proxy_server.serve_forever,
@@ -1477,20 +1477,20 @@ class GenericMCPApp:
             self.proxy_thread.start()
             if self.debug:
                 print(f"🔍 [PROXY DEBUG] Proxy server thread started: {self.proxy_thread.name}")
-            
+
             # Give it a moment to bind
             import time
             time.sleep(1)
             if self.debug:
                 print(f"🔍 [PROXY DEBUG] Waiting for proxy server to bind to port {port}...")
-            
+
             # Verify the server is actually listening
             try:
                 test_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
                 test_socket.settimeout(2)
                 result = test_socket.connect_ex(('localhost', port))
                 test_socket.close()
-                
+
                 if result == 0:
                     if self.debug:
                         print(f"✅ [PROXY DEBUG] HTTP proxy server is listening on port {port}")
@@ -1500,13 +1500,13 @@ class GenericMCPApp:
             except Exception as e:
                 if self.debug:
                     print(f"⚠️  [PROXY DEBUG] Error testing proxy server connectivity: {e}")
-            
+
         except Exception as e:
             print(f"❌ Failed to start HTTP proxy server: {e}")
             if self.debug:
                 import traceback
                 traceback.print_exc()
-    
+
     def stop_proxy_server(self):
         """Stop the HTTP proxy server"""
         if self.proxy_server:
@@ -1514,13 +1514,13 @@ class GenericMCPApp:
             self.proxy_server = None
             self.proxy_thread = None
             print("🛑 HTTP proxy server stopped")
-    
+
     def interactive_mode(self, start_proxy: bool = False, proxy_port: int = 3000):
         """Run interactive mode"""
         # Display Appsecco banner
         print(APPSECCO_BANNER)
         print(APPSECCO_TAGLINE)
-        
+
         print("\n" + "="*80)
         print("🔧 Appsecco MCP Client PST - Professional Security Testing Tool")
         print("="*80)
@@ -1530,39 +1530,39 @@ class GenericMCPApp:
         if self.use_proxychains:
             print("   - MCP server traffic routed through Burp port 8080 using Proxychains")
         print("   - Local proxy server routes HTTP requests via Burp port 8080")
-        
+
         if start_proxy:
             print("🚀 Will start HTTP proxy server for Burp inspection")
             print("📡 Configure Burp to intercept traffic to localhost:3000")
         else:
             print("⚠️  HTTP proxy server not enabled")
             print("💡 Use --start-proxy to enable Burp inspection\n")
-        
+
         if not self.select_server():
             return
-        
+
         if not self.start_server(start_proxy, proxy_port):
             print("❌ Failed to start server")
             return
-        
+
         # Display connection status after server is started
         if self.client.connection_mode == "direct-remote":
             print(f"📡 Remote MCP endpoint: {self.client.base_url}")
         else:
             print(f"📡 Local HTTP server: {self.client.base_url if self.client else 'Not connected'}")
-        
+
         try:
             # List available tools
             tools = self.client.list_tools()
             if not tools:
                 print("❌ No tools available")
                 return
-            
+
             print(f"\n🛠️  Available tools ({len(tools)}):")
             for i, tool in enumerate(tools, 1):
                 print(f"   {i}. {tool['name']}: {tool.get('description', 'No description')}")
-            
-            
+
+
             # Interactive menu
             while True:
                 print("\n" + "-"*60)
@@ -1574,9 +1574,9 @@ class GenericMCPApp:
                 print("3. 🔄 Switch server")
                 print("4. 🚪 Exit")
                 print("5. ℹ️  About Appsecco")
-                
+
                 choice = input("\nEnter your choice (1-5): ").strip()
-                
+
                 if choice == "1":
                     self._call_tool_interactive(tools)
                 elif choice == "2":
@@ -1598,7 +1598,7 @@ class GenericMCPApp:
                     self._show_about_appsecco()
                 else:
                     print("❌ Invalid choice. Please enter 1-5.")
-        
+
         except KeyboardInterrupt:
             print("\n\n⏹️  Interrupted by user")
         except Exception as e:
@@ -1607,7 +1607,7 @@ class GenericMCPApp:
             if self.client:
                 self.stop_proxy_server()
                 self.client.stop_server()
-            
+
             # Display Appsecco footer
             print("\n" + "="*80)
             print("🛡️  Thank you for using Appsecco MCP Client PST!")
@@ -1615,17 +1615,17 @@ class GenericMCPApp:
             print(f"©  {APPSECCO_COPYRIGHT}")
             print("🌐 Visit https://appsecco.com for professional security services")
             print("="*80)
-    
+
     def _call_tool_interactive(self, tools: List[Dict[str, Any]]):
         """Interactive tool calling"""
         print(f"\nSelect tool (1-{len(tools)}):")
         for i, tool in enumerate(tools, 1):
             print(f"   {i}. {tool['name']}")
-        
+
         try:
             choice = input(f"Enter tool number (1-{len(tools)}): ").strip()
             tool_index = int(choice) - 1
-            
+
             if 0 <= tool_index < len(tools):
                 tool = tools[tool_index]
                 self._get_tool_arguments_and_call(tool)
@@ -1635,36 +1635,31 @@ class GenericMCPApp:
             print("❌ Please enter a valid number")
         except KeyboardInterrupt:
             print("\n⏹️  Cancelled")
-    
+
     def _show_about_appsecco(self):
         """Display information about Appsecco"""
         print("\n" + "="*80)
         print("ℹ️  ABOUT APPSECCO - Your Trusted Security Partner")
         print("="*80)
         print("🛡️  Appsecco is a leading cybersecurity company specializing in:")
+        print("   • AI Agents, AI First Apps and MCP Server Penetration Tests")
         print("   • Penetration Testing & Security Assessments")
         print("   • Application Security Testing")
-        print("   • Infrastructure Security Audits")
+        print("   • Infrastructure Penetration Testing")
         print("   • Cloud Security Assessments")
-        print("   • Red Team Operations")
-        print("   • Security Training & Awareness")
         print()
-        print("🔍  This MCP Client PST tool is part of our professional security toolkit")
+        print("🔍  This MCP Client Proxy tool is part of our professional security toolkit")
         print("   designed for security researchers, penetration testers, and")
-        print("   security professionals who need advanced MCP server integration.")
+        print("   security professionals who need a tool to intercept and proxy MCP Local")
+        print("   and Remote Server traffic through an interception proxy like Burp/ZAP.")
         print()
         print("🌐  Website: https://appsecco.com")
-        print("📧  Email: info@appsecco.com")
+        print("📧  Email: contact@appsecco.com")
         print("📱  LinkedIn: https://linkedin.com/company/appsecco")
-        print("🐦  Twitter: @appsecco")
-        print()
-        print("💼  Professional Services:")
-        print("   • Enterprise Security Assessments")
-        print("   • Compliance & Regulatory Support")
-        print("   • Incident Response & Forensics")
-        print("   • Security Architecture Design")
+        print("📘  Blog: https://blog.appsecco.com")
+        print("🐦  Twitter: @appseccouk")
         print("="*80)
-    
+
     def _resolve_param_type(self, param_info: Dict[str, Any]) -> tuple:
         """Resolve parameter type and nullability from schema, handling anyOf.
 
@@ -1760,23 +1755,23 @@ class GenericMCPApp:
                 value = input(f"Enter value for {param_name} (or press Enter to skip): ").strip()
                 if value:
                     arguments[param_name] = self._coerce_value(value, param_type, is_nullable)
-        
+
         # Call the tool
         print(f"\n🚀 Calling {tool_name} with arguments: {json.dumps(arguments, indent=2)}")
-        
+
         try:
             result = self.client.call_tool(tool_name, arguments)
-            
+
             if result:
                 print("\n✅ Tool call successful!")
                 print("Result (may need additional formatting):")
                 print(json.dumps(result, indent=2))
             else:
                 print("\n❌ Tool call returned no result")
-                
+
         except Exception as e:
             print(f"\n❌ Error calling tool: {e}")
-    
+
 
 def main():
     """Main entry point for Appsecco MCP Client PST"""
@@ -1785,7 +1780,7 @@ def main():
 #     level=logging.DEBUG,
 #     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 # )
-    
+
     parser = argparse.ArgumentParser(
         description="Appsecco MCP Client PST - Professional Security Testing Tool with proxychains support",
         epilog="""Example: python app.py --start-proxy
@@ -1794,7 +1789,7 @@ def main():
 Brought to you by Appsecco - Your Trusted Security Partner""",
         formatter_class=argparse.RawDescriptionHelpFormatter
     )
-    parser.add_argument("--config", "-c", default="mcp_config.json", 
+    parser.add_argument("--config", "-c", default="mcp_config.json",
                        help="MCP configuration file (default: mcp_config.json)")
     parser.add_argument("--proxy", "-p", default="http://127.0.0.1:8080",
                        help="Burp proxy URL (default: http://127.0.0.1:8080)")
@@ -1813,7 +1808,7 @@ Brought to you by Appsecco - Your Trusted Security Partner""",
     parser.add_argument("--debug", action="store_true",
                         help="Enable debug output for troubleshooting")
 
-    
+
     args = parser.parse_args()
 
     analytics = get_analytics(
@@ -1822,13 +1817,13 @@ Brought to you by Appsecco - Your Trusted Security Partner""",
 
 # Track session start
     analytics.track_session_start()
-    
+
     # Check if config file exists
     if not os.path.exists(args.config):
         print(f"❌ Configuration file '{args.config}' not found")
         print("Please create a mcp_config.json file with your MCP server configuration")
         sys.exit(1)
-    
+
     # Determine if we should use Burp proxy and proxychains
     use_burp_proxy = not args.no_burp
     use_proxychains = not args.no_proxychains
@@ -1842,9 +1837,9 @@ Brought to you by Appsecco - Your Trusted Security Partner""",
         "proxy_port": args.proxy_port,
         "no_analytics": args.no_analytics
     })
-    
+
     app = GenericMCPApp(args.config, args.proxy, use_burp_proxy, use_proxychains, bypass_ssl, args.debug)
-    
+
     # Run interactive mode
     app.interactive_mode(args.start_proxy, args.proxy_port)
 
