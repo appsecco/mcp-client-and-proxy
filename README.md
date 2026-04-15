@@ -23,6 +23,7 @@ It acts as a universal MCP client that can connect to any MCP server — local o
 - **Static Header Auth** — API keys, Bearer tokens, custom headers
 - **HTTP/2 Support** — Direct remote connections use httpx with HTTP/2
 - **Proxychains Integration** — Route subprocess traffic through Burp
+- **Session Logging** — All CLI output is tee'd to a timestamped log file for later review
 - **Interactive CLI** — Select servers, list tools, call tools with arguments
 
 ---
@@ -331,6 +332,9 @@ Options:
   --no-ssl-bypass                 Keep SSL certificate verification enabled
   --no-analytics                  Disable anonymous usage analytics
   --debug                         Enable verbose debug output
+  --log-file LOG_FILE, -l LOG_FILE
+                                  Path to session log file
+                                  (default: logs/session_<timestamp>.log)
 ```
 
 ### Examples
@@ -353,7 +357,24 @@ python3 app.py --no-burp --no-proxychains
 
 # Debug mode for troubleshooting
 python3 app.py --debug --start-proxy
+
+# Write the session log to a custom path
+python3 app.py --log-file /tmp/my-session.log
 ```
+
+---
+
+## Session Logging
+
+Every run mirrors all CLI output (stdout + stderr) to a log file so you can review an engagement later or share findings with teammates.
+
+- **Default path**: `logs/session_<YYYYMMDD_HHMMSS>.log` (the `logs/` directory is auto-created)
+- **Override**: `python3 app.py --log-file /path/to/session.log` (or `-l`)
+- **Contents**: Everything printed to the terminal — banners, menu choices, tool calls, responses, errors — with ANSI color escapes stripped for readability
+- **Append-safe**: Each run adds a `===== Session started <timestamp> (pid <pid>) =====` header so reused files stay traceable
+- **Git-ignored**: `logs/` and `*.log` are in `.gitignore` so session output is never accidentally committed
+
+> **Note**: The log captures output the tool prints, including prompts. User input typed at interactive prompts is not captured.
 
 ---
 

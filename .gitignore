@@ -1,6 +1,7 @@
 # Config (may contain credentials/tokens)
 mcp_config.json
 mcp_config copy.old
+mcp_config*.json
 *.old
 
 # Burp CA cert (machine-specific, may contain sensitive material)
@@ -19,3 +20,7 @@ node_modules/
 
 # macOS
 .DS_Store
+
+# Session logs
+logs/
+*.log

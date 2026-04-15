@@ -10,6 +10,7 @@ Brought to you by Appsecco - Product Security Experts
 
 import json
 import os
+import re
 import sys
 import subprocess
 import time
@@ -17,6 +18,7 @@ import threading
 import queue
 import requests
 import platform
+from datetime import datetime
 from typing import Dict, Any, List, Optional
 import argparse
 import logging
@@ -28,6 +30,72 @@ import httpx
 from urllib.parse import urlencode, urlparse, parse_qs
 from http.server import HTTPServer, BaseHTTPRequestHandler
 from analytics import get_analytics
+
+
+# ANSI escape sequences (colors, cursor moves) — stripped from log files
+_ANSI_ESCAPE_RE = re.compile(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])')
+
+
+class _TeeStream:
+    """
+    File-like wrapper that writes to the original stream AND to a log file.
+    ANSI escapes are stripped from the log file copy so logs stay readable.
+    """
+
+    def __init__(self, original, log_file):
+        self._original = original
+        self._log_file = log_file
+
+    def write(self, data):
+        self._original.write(data)
+        try:
+            self._log_file.write(_ANSI_ESCAPE_RE.sub('', data))
+        except Exception:
+            pass
+        return len(data) if isinstance(data, str) else 0
+
+    def flush(self):
+        try:
+            self._original.flush()
+        finally:
+            try:
+                self._log_file.flush()
+            except Exception:
+                pass
+
+    def isatty(self):
+        try:
+            return self._original.isatty()
+        except Exception:
+            return False
+
+    def __getattr__(self, name):
+        return getattr(self._original, name)
+
+
+def _install_session_logger(log_path: str):
+    """
+    Tee stdout and stderr into `log_path`. Creates parent dirs if needed.
+    Returns the opened log file handle (kept open for the process lifetime)
+    or None if logging could not be set up.
+    """
+    try:
+        log_dir = os.path.dirname(os.path.abspath(log_path))
+        if log_dir:
+            os.makedirs(log_dir, exist_ok=True)
+        log_file = open(log_path, 'a', encoding='utf-8', buffering=1)
+        header = (
+            f"\n===== Session started {datetime.now().isoformat(timespec='seconds')} "
+            f"(pid {os.getpid()}) =====\n"
+        )
+        log_file.write(header)
+        log_file.flush()
+        sys.stdout = _TeeStream(sys.stdout, log_file)
+        sys.stderr = _TeeStream(sys.stderr, log_file)
+        return log_file
+    except Exception as e:
+        print(f"⚠️  Could not open session log '{log_path}': {e}")
+        return None
 
 # Appsecco Version Information
 APPSECCO_VERSION = "0.1.0"
@@ -780,6 +848,10 @@ class MCPClient:
                 if 'text/html' in content_type or response.text.strip().startswith('<html'):
                     self._debug_print(f"\n⚠️  [DEBUG] Detected HTML response instead of JSON from remote MCP!")
                     raise RuntimeError(f"Received HTML response instead of JSON from {self.base_url}")
+
+                # 202 Accepted is valid for notifications (MCP Streamable HTTP spec)
+                if response.status_code == 202 and method.startswith("notifications/"):
+                    return {"result": "accepted"}
 
                 if response.status_code != 200:
                     raise RuntimeError(f"Remote MCP returned status {response.status_code}")
@@ -1807,9 +1879,19 @@ Brought to you by Appsecco - Your Trusted Security Partner""",
                         help="Disable anonymous usage analytics")
     parser.add_argument("--debug", action="store_true",
                         help="Enable debug output for troubleshooting")
+    default_log_path = os.path.join(
+        "logs", f"session_{datetime.now().strftime('%Y%m%d_%H%M%S')}.log"
+    )
+    parser.add_argument("--log-file", "-l", default=default_log_path,
+                        help=f"Path to session log file (default: {os.path.join('logs', 'session_<timestamp>.log')})")
 
 
     args = parser.parse_args()
+
+    # Install the session logger first so all subsequent output is captured
+    session_log = _install_session_logger(args.log_file)
+    if session_log is not None:
+        print(f"📝 Session log: {args.log_file}")
 
     analytics = get_analytics(
         enabled=None if not args.no_analytics else False
